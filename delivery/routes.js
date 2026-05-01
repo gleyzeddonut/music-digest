@@ -63,9 +63,9 @@ router.post('/api/setup', (req, res) => {
 // ── Electron system settings ───────────────────────────────────
 
 router.get('/api/settings/login-item', (req, res) => {
-  if (!process.versions.electron) return res.json({ enabled: false });
+  if (!process.versions.electron) return res.json({ isElectron: false, enabled: false });
   const { app } = require('electron');
-  res.json({ enabled: app.getLoginItemSettings().openAtLogin });
+  res.json({ isElectron: true, enabled: app.getLoginItemSettings().openAtLogin });
 });
 
 router.post('/api/settings/login-item', (req, res) => {

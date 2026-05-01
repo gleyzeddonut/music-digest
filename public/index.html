@@ -1569,7 +1569,9 @@ async function loadElectronSettings() {
   try {
     const r = await fetch('/api/settings/login-item');
     if (!r.ok) return;
-    const { enabled } = await r.json();
+    const data = await r.json();
+    if (!data.isElectron) return;
+    const { enabled } = data;
     document.getElementById('launch-at-login').checked = enabled;
     document.getElementById('login-item-section').style.display = 'block';
     document.getElementById('api-keys-section').style.display = 'block';
@@ -1589,7 +1591,7 @@ async function saveConfigSettings() {
   if (digestTo && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(digestTo)) {
     toast('Invalid email address'); return;
   }
-  await api('/api/settings/config', 'POST', { digestTo: digestTo || undefined, claudeApiKey });
+  await api('/api/settings/config', 'POST', { digestTo: digestTo || undefined, claudeApiKey: claudeApiKey || undefined });
   toast('Saved');
   document.getElementById('setting-claude-key').value = '';
 }
