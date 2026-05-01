@@ -4,7 +4,24 @@ const { getDb } = require('../db/init');
 const { runDigest } = require('../processor/digest');
 const { getAuthUrl, handleCallback, isConnected, getPlaylistUrl } = require('../processor/spotify');
 
+// config-store is only available and callable in Electron context
+const configStore = process.versions.electron
+  ? require('../electron/config-store')
+  : { getConfig: () => null, setConfig: () => {} };
+
 const router = express.Router();
+
+// Persists user-supplied setup values to all three stores so the current
+// session, DB scheduler, and next app launch all see the new values.
+function persistSetupConfig(digestTo, claudeApiKey) {
+  configStore.setConfig('digest_to', digestTo);
+  if (claudeApiKey) configStore.setConfig('claude_api_key', claudeApiKey);
+
+  getDb().prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('digest_to', digestTo);
+
+  process.env.DIGEST_TO = digestTo;
+  if (claudeApiKey) process.env.CLAUDE_API_KEY = claudeApiKey;
+}
 
 // ── Log streaming ─────────────────────────────────────────────
 const sseClients = new Set();
@@ -27,8 +44,7 @@ router.get('/setup', (req, res) => {
 // Route guard: redirect to /setup if digest email not yet configured
 router.get('/', (req, res, next) => {
   if (process.versions.electron) {
-    const { getConfig } = require('../electron/config-store');
-    if (!getConfig('digest_to')) return res.redirect('/setup');
+    if (!configStore.getConfig('digest_to')) return res.redirect('/setup');
   }
   next(); // fall through to express.static which serves public/index.html
 });
@@ -40,18 +56,7 @@ router.post('/api/setup', (req, res) => {
     return res.status(400).json({ error: 'Valid email address required' });
   }
 
-  const { setConfig } = require('../electron/config-store');
-  setConfig('digest_to', digestTo.trim());
-  if (claudeApiKey?.trim()) setConfig('claude_api_key', claudeApiKey.trim());
-
-  // Also write to the DB settings table so email.js picks it up without restart
-  const db = getDb();
-  db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('digest_to', digestTo.trim());
-
-  // Update process.env so config.DIGEST_TO reflects the new value this session
-  process.env.DIGEST_TO = digestTo.trim();
-  if (claudeApiKey?.trim()) process.env.CLAUDE_API_KEY = claudeApiKey.trim();
-
+  persistSetupConfig(digestTo.trim(), claudeApiKey?.trim() || null);
   res.json({ ok: true });
 });
 
