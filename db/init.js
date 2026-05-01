@@ -9,11 +9,9 @@ function getDbPath() {
   return path.join(__dirname, 'digests.db');
 }
 
-const DB_PATH = getDbPath();
-
 let _db;
 function getDb() {
-  if (!_db) _db = new Database(DB_PATH);
+  if (!_db) _db = new Database(getDbPath());
   return _db;
 }
 

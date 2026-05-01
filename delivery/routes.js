@@ -241,7 +241,15 @@ router.post('/api/settings/schedule', (req, res) => {
   if (frequency) set('schedule_frequency', frequency);
   if (weekDay !== undefined) set('schedule_week_day', String(weekDay));
   if (monthDate !== undefined) set('schedule_month_date', String(monthDate));
-  if (digestTo) set('digest_to', digestTo.trim());
+  if (digestTo) {
+    set('digest_to', digestTo.trim());
+    // Keep config-store and process.env in sync so Electron reads the correct
+    // email on next launch and the running session delivers to the right address.
+    if (process.versions.electron) {
+      configStore.setConfig('digest_to', digestTo.trim());
+      process.env.DIGEST_TO = digestTo.trim();
+    }
+  }
   res.json({ ok: true });
 });
 
