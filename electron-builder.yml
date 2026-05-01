@@ -8,6 +8,8 @@ directories:
 mac:
   category: public.app-category.music
   icon: assets/icon.icns
+  # Unsigned distribution — recipients right-click → Open on first launch
+  identity: null
   target:
     - target: dmg
       arch: [x64, arm64]
