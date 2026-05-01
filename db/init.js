@@ -1,7 +1,15 @@
 const Database = require('better-sqlite3');
 const path = require('path');
 
-const DB_PATH = path.join(__dirname, 'digests.db');
+function getDbPath() {
+  if (process.versions.electron) {
+    const { app } = require('electron');
+    return path.join(app.getPath('userData'), 'digests.db');
+  }
+  return path.join(__dirname, 'digests.db');
+}
+
+const DB_PATH = getDbPath();
 
 let _db;
 function getDb() {
