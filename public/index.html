@@ -1082,6 +1082,35 @@
           <div class="settings-val" id="cfg-playlist">—</div>
         </div>
       </div>
+
+      <!-- Launch at Login (Electron only) -->
+      <div id="login-item-section" style="display:none; margin-top:24px;">
+        <div style="font-size:11px;color:#e76f51;letter-spacing:3px;text-transform:uppercase;margin-bottom:12px;">System</div>
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;color:#333;">
+          <input type="checkbox" id="launch-at-login" onchange="setLaunchAtLogin(this.checked)"
+            style="width:16px;height:16px;accent-color:#e76f51;cursor:pointer;">
+          Launch Music Digest at login
+        </label>
+      </div>
+
+      <!-- API Keys (Electron only) -->
+      <div id="api-keys-section" style="display:none; margin-top:28px;">
+        <div style="font-size:11px;color:#e76f51;letter-spacing:3px;text-transform:uppercase;margin-bottom:12px;">Account</div>
+        <div style="margin-bottom:14px;">
+          <label style="font-size:12px;font-weight:600;color:#666;display:block;margin-bottom:4px;">Digest email</label>
+          <div style="display:flex;gap:8px;">
+            <input id="setting-digest-to" type="email" placeholder="you@example.com"
+              style="flex:1;padding:8px 10px;border:1px solid #ddd;border-radius:4px;font-size:14px;">
+            <button onclick="saveConfigSettings()" style="background:#e76f51;color:#fff;border:none;border-radius:4px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;">Save</button>
+          </div>
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;color:#666;display:block;margin-bottom:4px;">Claude API key <span style="font-weight:400;color:#aaa;">(optional)</span></label>
+          <input id="setting-claude-key" type="password" placeholder="Leave blank to use shared key"
+            style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:4px;font-size:14px;">
+          <div style="font-size:11px;color:#aaa;margin-top:4px;">Only needed if you want to use your own Anthropic account.</div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -1536,6 +1565,35 @@ async function loadSettings() {
   $('spotify-settings-content').innerHTML = spotifyHtml;
 }
 
+async function loadElectronSettings() {
+  try {
+    const r = await fetch('/api/settings/login-item');
+    if (!r.ok) return;
+    const { enabled } = await r.json();
+    document.getElementById('launch-at-login').checked = enabled;
+    document.getElementById('login-item-section').style.display = 'block';
+    document.getElementById('api-keys-section').style.display = 'block';
+    const s = await api('/api/settings');
+    if (s.email) document.getElementById('setting-digest-to').value = s.email;
+  } catch {}
+}
+
+async function setLaunchAtLogin(enabled) {
+  await api('/api/settings/login-item', 'POST', { enabled });
+  toast(enabled ? 'Will launch at login' : 'Login launch disabled');
+}
+
+async function saveConfigSettings() {
+  const digestTo = document.getElementById('setting-digest-to').value.trim();
+  const claudeApiKey = document.getElementById('setting-claude-key').value.trim();
+  if (digestTo && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(digestTo)) {
+    toast('Invalid email address'); return;
+  }
+  await api('/api/settings/config', 'POST', { digestTo: digestTo || undefined, claudeApiKey });
+  toast('Saved');
+  document.getElementById('setting-claude-key').value = '';
+}
+
 // ─── LOG PANEL ────────────────────────────────────────────────
 let _logEs = null;
 
@@ -1702,6 +1760,7 @@ const savedPage = localStorage.getItem('activePage') || 'digest';
 navigateTo(savedPage);
 if (savedPage !== 'digest') loadDigest(); // always pre-load digest data for the sidebar status
 loadStatus();
+loadElectronSettings();
 </script>
 </body>
 </html>

@@ -60,6 +60,43 @@ router.post('/api/setup', (req, res) => {
   res.json({ ok: true });
 });
 
+// ── Electron system settings ───────────────────────────────────
+
+router.get('/api/settings/login-item', (req, res) => {
+  if (!process.versions.electron) return res.json({ enabled: false });
+  const { app } = require('electron');
+  res.json({ enabled: app.getLoginItemSettings().openAtLogin });
+});
+
+router.post('/api/settings/login-item', (req, res) => {
+  if (!process.versions.electron) return res.status(404).json({ error: 'Not available outside Electron' });
+  const { enabled } = req.body;
+  const { app } = require('electron');
+  app.setLoginItemSettings({ openAtLogin: !!enabled });
+  res.json({ ok: true });
+});
+
+// Update user-configurable config values
+router.post('/api/settings/config', (req, res) => {
+  if (!process.versions.electron) return res.status(404).json({ error: 'Not available outside Electron' });
+  const { digestTo, claudeApiKey } = req.body;
+
+  if (digestTo?.trim()) {
+    configStore.setConfig('digest_to', digestTo.trim());
+    getDb().prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('digest_to', digestTo.trim());
+    process.env.DIGEST_TO = digestTo.trim();
+  }
+  if (claudeApiKey !== undefined) {
+    if (claudeApiKey.trim()) {
+      configStore.setConfig('claude_api_key', claudeApiKey.trim());
+      process.env.CLAUDE_API_KEY = claudeApiKey.trim();
+    } else {
+      configStore.setConfig('claude_api_key', null);
+    }
+  }
+  res.json({ ok: true });
+});
+
 // ── Spotify OAuth ─────────────────────────────────────────────
 
 router.get('/auth/spotify', (req, res) => {
