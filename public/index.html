@@ -836,6 +836,25 @@
     }
     .log-close-btn:hover { color: var(--text); }
 
+    #log-toggle-btn {
+      position: fixed;
+      top: 16px; right: 16px;
+      z-index: 200;
+      background: var(--bg2);
+      border: 1px solid var(--dim);
+      border-radius: 4px;
+      padding: 5px 10px;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--muted);
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    #log-toggle-btn:hover { color: var(--text); border-color: var(--muted); }
+    #log-toggle-btn.active { color: var(--peach); border-color: var(--peach); }
+
     #log-output {
       flex: 1;
       overflow-y: auto;
@@ -1117,6 +1136,9 @@
 </main>
 
 <div id="toast"></div>
+
+<!-- Log toggle -->
+<button id="log-toggle-btn" onclick="toggleLogPanel()">Log</button>
 
 <!-- Log Panel -->
 <div id="log-panel">
@@ -1603,14 +1625,25 @@ async function saveConfigSettings() {
 // ─── LOG PANEL ────────────────────────────────────────────────
 let _logEs = null;
 
+function setLogPanelVisible(visible) {
+  $('log-panel').classList.toggle('open', visible);
+  $('log-toggle-btn').classList.toggle('active', visible);
+  localStorage.setItem('logPanelVisible', visible ? 'true' : 'false');
+}
+
+function toggleLogPanel() {
+  const isOpen = $('log-panel').classList.contains('open');
+  setLogPanelVisible(!isOpen);
+}
+
 function openLogPanel() {
-  $('log-panel').classList.add('open');
+  setLogPanelVisible(true);
   $('log-output').innerHTML = '';
   setRunStatus('running', 'Running...');
 }
 
 function closeLogPanel() {
-  $('log-panel').classList.remove('open');
+  setLogPanelVisible(false);
   if (_logEs) { _logEs.close(); _logEs = null; }
 }
 
@@ -1767,6 +1800,8 @@ navigateTo(savedPage);
 if (savedPage !== 'digest') loadDigest(); // always pre-load digest data for the sidebar status
 loadStatus();
 loadElectronSettings();
+// Log panel: restore saved preference, default hidden on first run
+if (localStorage.getItem('logPanelVisible') === 'true') setLogPanelVisible(true);
 </script>
 </body>
 </html>
