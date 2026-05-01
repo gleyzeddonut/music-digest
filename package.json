@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node index.js",
     "dev": "node --watch index.js",
-    "electron": "electron .",
+    "electron": "electron-rebuild -f -w better-sqlite3 && electron .",
     "dist": "electron-builder --mac"
   },
   "dependencies": {
