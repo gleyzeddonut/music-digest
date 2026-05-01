@@ -82,7 +82,14 @@ async function processWithClaude(date, redditData, webData, tiktokData = [], pla
     throw new Error('CLAUDE_API_KEY not set in .env');
   }
 
-  const client = new Anthropic({ apiKey: config.CLAUDE_API_KEY });
+  let apiKey = config.CLAUDE_API_KEY;
+  if (process.versions.electron) {
+    try {
+      const { getConfig } = require('../electron/config-store');
+      apiKey = getConfig('claude_api_key') || apiKey;
+    } catch (_) {}
+  }
+  const client = new Anthropic({ apiKey });
   const rawContent = buildPrompt(date, redditData, webData, tiktokData, playlistData, scoredData);
 
   const systemPrompt = `You are a music industry analyst creating a daily briefing. Your job is to surface what is genuinely generating buzz today, stated plainly.
