@@ -1551,6 +1551,8 @@ async function loadSettings() {
   $('cfg-week-day').value   = String(s.weekDay ?? 5);
   $('cfg-month-date').value = String(s.monthDate ?? 1);
   $('cfg-email').value      = s.email || '';
+  const digestToEl = document.getElementById('setting-digest-to');
+  if (digestToEl && s.email) digestToEl.value = s.email;
   onFrequencyChange();
   $('cfg-timezone').textContent = s.timezone || '—';
   $('cfg-tracks').textContent    = status.tracksInPlaylist ?? '—';
@@ -1575,8 +1577,6 @@ async function loadElectronSettings() {
     document.getElementById('launch-at-login').checked = enabled;
     document.getElementById('login-item-section').style.display = 'block';
     document.getElementById('api-keys-section').style.display = 'block';
-    const existingEmail = document.getElementById('cfg-email')?.value;
-    if (existingEmail) document.getElementById('setting-digest-to').value = existingEmail;
   } catch {}
 }
 
