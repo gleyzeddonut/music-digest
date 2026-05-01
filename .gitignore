@@ -4,3 +4,7 @@ dist/
 .DS_Store
 *.db
 assets/icon.iconset/
+.firecrawl/
+*.log
+npm-debug.log*
+out/
