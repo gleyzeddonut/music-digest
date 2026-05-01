@@ -12,7 +12,9 @@ function getSendTime() {
     const { getDb } = require('../db/init');
     const row = getDb().prepare("SELECT value FROM settings WHERE key = 'schedule_send_time'").get();
     if (row?.value) return row.value;
-  } catch {}
+  } catch (err) {
+    console.warn('[tray] Could not read send time from DB:', err.message);
+  }
   return process.env.SEND_TIME || '08:00';
 }
 
@@ -40,6 +42,7 @@ function createTray() {
   const icon = nativeImage.createFromPath(iconPath);
   tray = new Tray(icon);
   tray.setToolTip('Music Digest');
+  // Menu is built once; send time label reflects value at launch, not live updates
   tray.setContextMenu(buildTrayMenu());
   tray.on('click', showWindow);
 }
