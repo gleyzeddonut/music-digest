@@ -3,6 +3,7 @@ const path = require('path');
 
 let mainWindow = null;
 let tray = null;
+let isQuitting = false;
 
 // ── Helpers ───────────────────────────────────────────────────
 
@@ -21,7 +22,7 @@ function buildTrayMenu() {
     { type: 'separator' },
     { label: `Next digest: ${getSendTime()}`, enabled: false },
     { type: 'separator' },
-    { label: 'Quit Music Digest', click: () => app.quit() },
+    { label: 'Quit Music Digest', click: () => { isQuitting = true; app.quit(); } },
   ]);
 }
 
@@ -62,6 +63,7 @@ function createWindow(setupNeeded) {
 
   // Hide instead of close so the scheduler keeps running
   mainWindow.on('close', (e) => {
+    if (isQuitting) return;
     e.preventDefault();
     mainWindow.hide();
   });
