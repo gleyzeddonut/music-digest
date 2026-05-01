@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Tray, Menu, nativeImage, shell } = require('electron');
+const { app, BrowserWindow, Tray, Menu, nativeImage, shell, globalShortcut } = require('electron');
 const path = require('path');
 
 let mainWindow = null;
@@ -115,6 +115,16 @@ if (!gotLock) {
 
     createWindow(setupNeeded);
     createTray();
+
+    // Dev shortcuts (unpackaged only)
+    if (!app.isPackaged) {
+      globalShortcut.register('CommandOrControl+Option+I', () => {
+        mainWindow?.webContents.toggleDevTools();
+      });
+      globalShortcut.register('CommandOrControl+R', () => {
+        mainWindow?.webContents.reload();
+      });
+    }
   });
 
   // Clicking the Dock icon re-shows the window
