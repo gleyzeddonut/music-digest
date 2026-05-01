@@ -86,8 +86,10 @@ async function processWithClaude(date, redditData, webData, tiktokData = [], pla
   if (process.versions.electron) {
     try {
       const { getConfig } = require('../electron/config-store');
-      apiKey = getConfig('claude_api_key') || apiKey;
-    } catch (_) {}
+      apiKey = getConfig('claude_api_key') ?? apiKey;
+    } catch (err) {
+      console.warn('[claude] Could not read Electron config-store:', err.message);
+    }
   }
   const client = new Anthropic({ apiKey });
   const rawContent = buildPrompt(date, redditData, webData, tiktokData, playlistData, scoredData);
