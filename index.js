@@ -39,8 +39,8 @@ function shouldSendToday(now) {
 }
 
 function startServer() {
-  return new Promise((resolve) => {
-    initDb();
+  return new Promise((resolve, reject) => {
+    try { initDb(); } catch (err) { return reject(err); }
 
     let lastScheduledRun = null;
 
@@ -78,7 +78,7 @@ function startServer() {
 ╚══════════════════════════════════════════╝
 `);
       resolve();
-    });
+    }).on('error', reject);
   });
 }
 

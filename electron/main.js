@@ -96,7 +96,18 @@ if (!gotLock) {
 
     // Start Express server
     const { startServer } = require('../index');
-    await startServer();
+    try {
+      await startServer();
+    } catch (err) {
+      const { dialog } = require('electron');
+      if (err.code === 'EADDRINUSE') {
+        dialog.showErrorBox('Music Digest', 'Music Digest is already running.\n\nCheck the menu bar icon (top-right of your screen).');
+      } else {
+        dialog.showErrorBox('Music Digest — Startup Error', err.message);
+      }
+      app.quit();
+      return;
+    }
 
     // Check if first-run setup is needed
     const { getConfig } = require('./config-store');
