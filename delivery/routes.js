@@ -1,4 +1,5 @@
 const express = require('express');
+const path = require('path');
 const { getDb } = require('../db/init');
 const { runDigest } = require('../processor/digest');
 const { getAuthUrl, handleCallback, isConnected, getPlaylistUrl } = require('../processor/spotify');
@@ -16,6 +17,43 @@ function broadcastLog(level, args) {
     try { client.write(`data: ${payload}\n\n`); } catch (_) {}
   }
 }
+
+// ── Setup (first-run) ──────────────────────────────────────────
+
+router.get('/setup', (req, res) => {
+  res.sendFile(path.join(__dirname, '../public/setup.html'));
+});
+
+// Route guard: redirect to /setup if digest email not yet configured
+router.get('/', (req, res, next) => {
+  if (process.versions.electron) {
+    const { getConfig } = require('../electron/config-store');
+    if (!getConfig('digest_to')) return res.redirect('/setup');
+  }
+  next(); // fall through to express.static which serves public/index.html
+});
+
+router.post('/api/setup', (req, res) => {
+  if (!process.versions.electron) return res.status(404).json({ error: 'Not available outside Electron' });
+  const { digestTo, claudeApiKey } = req.body;
+  if (!digestTo || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(digestTo)) {
+    return res.status(400).json({ error: 'Valid email address required' });
+  }
+
+  const { setConfig } = require('../electron/config-store');
+  setConfig('digest_to', digestTo.trim());
+  if (claudeApiKey?.trim()) setConfig('claude_api_key', claudeApiKey.trim());
+
+  // Also write to the DB settings table so email.js picks it up without restart
+  const db = getDb();
+  db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('digest_to', digestTo.trim());
+
+  // Update process.env so config.DIGEST_TO reflects the new value this session
+  process.env.DIGEST_TO = digestTo.trim();
+  if (claudeApiKey?.trim()) process.env.CLAUDE_API_KEY = claudeApiKey.trim();
+
+  res.json({ ok: true });
+});
 
 // ── Spotify OAuth ─────────────────────────────────────────────
 
