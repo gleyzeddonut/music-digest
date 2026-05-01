@@ -1,0 +1,40 @@
+appId: com.musicdigest.app
+productName: Music Digest
+copyright: Copyright © 2026
+
+directories:
+  output: dist
+
+mac:
+  category: public.app-category.music
+  icon: assets/icon.icns
+  target:
+    - target: dmg
+      arch: [x64, arm64]
+
+dmg:
+  title: Music Digest
+  contents:
+    - x: 130
+      y: 220
+      type: file
+    - x: 410
+      y: 220
+      type: link
+      path: /Applications
+
+# Bundle the .env so Electron can load shared credentials at runtime.
+# This file is in .gitignore — you must have it locally to build.
+extraResources:
+  - from: ".env"
+    to: ".env"
+
+files:
+  - "**/*"
+  - "!docs/**"
+  - "!test/**"
+  - "!.env*"
+  - "!.firecrawl/**"
+  - "!visuals/**"
+  - "!assets/icon.iconset/**"
+  - "!*.md"
