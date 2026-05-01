@@ -76,7 +76,9 @@ router.post('/api/settings/login-item', (req, res) => {
   res.json({ ok: true });
 });
 
-// Update user-configurable config values
+// Update user-configurable config values.
+// Unlike persistSetupConfig (which sets all fields unconditionally), this is a
+// patch-style route: only fields present in the request body are updated.
 router.post('/api/settings/config', (req, res) => {
   if (!process.versions.electron) return res.status(404).json({ error: 'Not available outside Electron' });
   const { digestTo, claudeApiKey } = req.body;
