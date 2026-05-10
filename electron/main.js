@@ -131,4 +131,9 @@ if (!gotLock) {
   app.on('activate', () => {
     if (mainWindow) showWindow();
   });
+
+  // Cmd+Q (and Dock → Quit) must set the flag so the close handler doesn't intercept
+  app.on('before-quit', () => {
+    isQuitting = true;
+  });
 }
