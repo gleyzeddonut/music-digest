@@ -6,7 +6,7 @@
   <title>Music Digest</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700;900&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700;900&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,400&family=IBM+Plex+Mono:wght@400;500&family=Cormorant+Garamond:ital,wght@0,300;0,600;1,300;1,600&family=Playfair+Display:ital,wght@0,700;0,900;1,400;1,700;1,900&display=swap" rel="stylesheet">
   <style>
     :root {
       /* Backgrounds — warm coral-brown, deep */
@@ -172,6 +172,26 @@
     .page { display: none; padding: 0; }
     .page.active { display: block; }
 
+    /* ─── DIGEST GREETING ─── */
+    .digest-greeting {
+      padding: var(--s4) var(--s5) 0;
+      font-family: 'Cormorant Garamond', Georgia, serif;
+      font-size: clamp(24px, 3vw, 40px);
+      font-weight: 300;
+      font-style: italic;
+      color: var(--text2);
+      opacity: 0.45;
+      letter-spacing: 0.3px;
+      line-height: 1.1;
+    }
+    .digest-greeting strong {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-weight: 700;
+      font-style: italic;
+      color: var(--text);
+      opacity: 1;
+    }
+
     /* ─── DIGEST HERO ─── */
     .digest-hero {
       padding: var(--s5) var(--s5) var(--s4);
@@ -227,19 +247,19 @@
       font-family: var(--font-display);
       font-weight: 900;
       font-size: clamp(36px, 5.5vw, 72px);
-      line-height: 1.05;
+      line-height: 1.1;
       color: var(--text);
-      margin-bottom: 24px;
+      margin-bottom: 20px;
       max-width: 820px;
       letter-spacing: -1px;
     }
     .digest-title span { color: var(--peach); }
 
     .digest-summary {
-      max-width: 700px;
-      line-height: 1.9;
+      max-width: 680px;
+      line-height: 1.65;
       color: var(--text2);
-      font-size: 17px;
+      font-size: 16px;
       font-weight: 300;
     }
     .digest-bullets {
@@ -247,7 +267,7 @@
       padding: 0;
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 8px;
     }
     .digest-bullets li {
       padding-left: 18px;
@@ -425,9 +445,56 @@
     .song-artist {
       color: var(--muted);
       font-size: 14px;
-      text-align: right;
       font-weight: 300;
     }
+    .song-signal { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
+    .song-badge {
+      font-family: var(--font-mono);
+      font-size: 8px;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      padding: 2px 5px;
+      border-radius: 3px;
+      white-space: nowrap;
+    }
+    .song-badge-lfm    { background: rgba(188,28,28,0.12); color: #e05c5c; }
+    .song-badge-genius { background: rgba(255,255,0,0.08); color: #c8b840; }
+    .song-listen { width: 44px; text-align: center; padding-right: 12px; }
+    .song-listen a, .song-play-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      color: var(--muted);
+      text-decoration: none;
+      transition: color 0.15s, background 0.15s;
+      cursor: pointer;
+    }
+    .song-listen a:hover { color: #1DB954; background: rgba(29,185,84,0.12); }
+    .song-play-btn {
+      background: transparent;
+      border: none;
+      padding: 0;
+    }
+    .song-play-btn:hover { color: var(--coral); background: rgba(231,111,81,0.12); }
+    .song-play-btn.playing { color: var(--coral); background: rgba(231,111,81,0.12); }
+    .digest-resend-btn {
+      margin-left: auto;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--muted);
+      background: transparent;
+      border: 1px solid var(--dim);
+      border-radius: 3px;
+      padding: 4px 9px;
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .digest-resend-btn:hover { color: var(--text); border-color: var(--muted); }
     .badge {
       display: inline-block;
       font-family: var(--font-mono);
@@ -710,6 +777,17 @@
     .settings-key { font-size: 14px; color: var(--text2); font-weight: 300; }
     .settings-val { font-family: var(--font-display); font-weight: 500; font-size: 14px; color: var(--text); }
 
+    /* ─── EDIT-IN-PLACE ─── */
+    .editable-cell { display: flex; align-items: center; gap: 8px; }
+    .editable-val { font-family: var(--font-display); font-weight: 500; font-size: 14px; color: var(--text); }
+    .editable-input { background: var(--bg2); border: 1px solid var(--dim); border-radius: 4px; padding: 5px 9px; font-size: 13px; color: var(--text); outline: none; font-family: var(--font-display); }
+    .editable-input:focus { border-color: var(--coral); }
+    .edit-btn { font-size: 10px; font-weight: 600; letter-spacing: 0.6px; text-transform: uppercase; color: var(--text2); background: transparent; border: 1px solid var(--dim); border-radius: 4px; padding: 3px 10px; cursor: pointer; transition: border-color 0.15s, color 0.15s; }
+    .edit-btn:hover { border-color: var(--coral); color: var(--coral); }
+    .save-btn { font-size: 10px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; color: #fff; background: var(--coral); border: none; border-radius: 4px; padding: 4px 12px; cursor: pointer; }
+    .cancel-btn { font-size: 10px; font-weight: 600; letter-spacing: 0.6px; text-transform: uppercase; color: var(--text2); background: transparent; border: 1px solid var(--dim); border-radius: 4px; padding: 3px 10px; cursor: pointer; }
+    .cancel-btn:hover { color: var(--text); border-color: var(--text2); }
+
     /* ─── TOAST ─── */
     #toast {
       position: fixed;
@@ -774,11 +852,42 @@
     .banner-info { background: rgba(231,111,81,0.08); color: var(--coral); border-bottom: 1px solid rgba(231,111,81,0.2); }
     .banner-success { background: rgba(244,162,97,0.08); color: var(--peach); border-bottom: 1px solid rgba(244,162,97,0.2); }
 
+    /* ─── HISTORY NAV STRIP ─── */
+    .history-nav-strip {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px var(--s5);
+      background: var(--bg2);
+      border-bottom: 1px solid var(--dim);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 1px;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+    .history-nav-strip button {
+      background: none;
+      border: 1px solid var(--dim);
+      border-radius: 3px;
+      color: var(--peach);
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      padding: 3px 10px;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+    .history-nav-strip button:hover { border-color: var(--peach); }
+
     /* ─── LOG PANEL ─── */
     #log-panel {
       position: fixed;
       top: 0; right: 0; bottom: 0;
       width: 400px;
+      min-width: 240px;
+      max-width: 680px;
       background: #0d0905;
       border-left: 1px solid var(--dim);
       z-index: 300;
@@ -788,14 +897,35 @@
       transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     }
     #log-panel.open { transform: translateX(0); }
+    .log-resize-handle {
+      position: absolute;
+      top: 0; left: -5px; bottom: 0;
+      width: 10px;
+      cursor: ew-resize;
+      z-index: 10;
+      transition: background 0.15s;
+    }
+    .log-resize-handle:hover,
+    .log-resize-handle.dragging { background: rgba(231,111,81,0.12); }
 
     .log-panel-header {
-      padding: 14px 18px;
+      padding: 12px 18px;
       border-bottom: 1px solid var(--dim);
       display: flex;
       align-items: center;
-      gap: 10px;
       flex-shrink: 0;
+    }
+    .log-panel-right {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 3px;
+    }
+    .log-panel-top-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
     .log-panel-tag {
       font-family: var(--font-mono);
@@ -803,14 +933,13 @@
       letter-spacing: 3px;
       color: var(--peach);
       text-transform: uppercase;
-      flex: 1;
     }
     .log-run-status {
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 5px;
       font-family: var(--font-mono);
-      font-size: 10px;
+      font-size: 8px;
       color: var(--muted);
     }
     .log-run-dot {
@@ -829,12 +958,36 @@
     .log-close-btn {
       background: none; border: none;
       color: var(--muted); cursor: pointer;
-      font-size: 15px; line-height: 1;
-      padding: 3px 5px;
+      font-size: 22px; line-height: 1;
+      padding: 4px 6px;
       font-family: var(--font-mono);
       transition: color 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin-right: 12px;
     }
     .log-close-btn:hover { color: var(--text); }
+    .log-close-arrow {
+      font-size: 13px;
+      opacity: 0.5;
+    }
+    .log-auto-pill {
+      font-family: var(--font-mono);
+      font-size: 8px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--muted);
+      background: transparent;
+      border: 1px solid var(--dim);
+      border-radius: 3px;
+      padding: 2px 7px;
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .log-auto-pill.on { color: var(--teal); border-color: var(--teal); }
+    /* ─── SCHEDULE COLLAPSE ─── */
+    .schedule-collapsed .schedule-detail { display: none; }
 
     #log-toggle-btn {
       position: fixed;
@@ -854,6 +1007,28 @@
     }
     #log-toggle-btn:hover { color: var(--text); border-color: var(--muted); }
     #log-toggle-btn.active { color: var(--peach); border-color: var(--peach); }
+
+    #run-phase-status {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--muted);
+      text-align: center;
+      margin-top: 6px;
+      height: 14px;
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+    }
+    #run-phase-status.visible { opacity: 1; }
+    @keyframes dot-cycle {
+      0%, 100% { content: '.'; }
+      33%       { content: '..'; }
+      66%       { content: '...'; }
+    }
+    #run-phase-status .phase-dots::after {
+      content: '.';
+      animation: dot-cycle 1.2s steps(1, end) infinite;
+    }
 
     #log-output {
       flex: 1;
@@ -888,7 +1063,7 @@
     .log-line {
       padding: 1px 18px 1px 28px;
       font-family: var(--font-mono);
-      font-size: 11px;
+      font-size: 10px;
       line-height: 1.9;
       color: #8a7060;
       word-break: break-word;
@@ -896,10 +1071,10 @@
     .log-line .lp { color: #6a5248; }
     .log-line.is-result {
       color: var(--text2);
-      font-size: 11.5px;
+      font-size: 10px;
     }
     .log-line.is-result .lp { color: var(--peach); opacity: 0.7; }
-    .log-line.is-success { color: var(--teal); font-size: 11.5px; }
+    .log-line.is-success { color: var(--teal); font-size: 10px; }
     .log-line.is-success .lp { color: var(--teal); opacity: 0.7; }
     .log-line.is-error { color: var(--coral); }
     .log-line.is-dim {
@@ -924,9 +1099,50 @@
       height: 1px;
       background: rgba(42,157,143,0.3);
     }
+
+    #update-bar {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      background: var(--teal);
+      color: #fff;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.5px;
+      padding: 7px 16px;
+      position: sticky;
+      top: 0;
+      z-index: 9999;
+      width: 100%;
+    }
+    #update-bar a {
+      color: #fff;
+      font-weight: 600;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+    #update-bar a:hover { opacity: 0.85; }
+    #update-bar-dismiss {
+      background: none;
+      border: none;
+      color: #fff;
+      cursor: pointer;
+      font-size: 14px;
+      line-height: 1;
+      opacity: 0.7;
+      padding: 0 2px;
+    }
+    #update-bar-dismiss:hover { opacity: 1; }
   </style>
 </head>
 <body>
+
+<div id="update-bar">
+  <span>A new version of Music Digest is available —</span>
+  <a id="update-bar-link" href="#" onclick="window.open(this.href,'_blank'); return false"></a>
+  <button id="update-bar-dismiss" onclick="document.getElementById('update-bar').style.display='none'" title="Dismiss">✕</button>
+</div>
 
 <!-- Sidebar -->
 <aside id="sidebar">
@@ -950,6 +1166,7 @@
   </nav>
   <div class="sidebar-footer">
     <button id="run-btn">▶ Run Now</button>
+    <div id="run-phase-status"></div>
     <div class="spotify-status">
       <div class="dot" id="spotify-dot"></div>
       <span id="spotify-status-text">Checking...</span>
@@ -962,12 +1179,7 @@
 
   <!-- Today's Digest -->
   <div id="page-digest" class="page active">
-    <div id="digest-content">
-      <div class="empty-state">
-        <div class="icon">◈</div>
-        <div class="title">Loading...</div>
-      </div>
-    </div>
+    <div id="digest-content"></div>
   </div>
 
   <!-- History -->
@@ -1034,6 +1246,15 @@
       <div class="settings-section">
         <div class="settings-section-title">Schedule</div>
         <div class="settings-row">
+          <div class="settings-key">
+            Scheduled emails
+            <div style="font-size:10px;color:var(--muted);margin-top:2px;">Pause without losing your schedule</div>
+          </div>
+          <div>
+            <button id="schedule-enabled-toggle" class="source-toggle" onclick="toggleScheduleEnabled(this)" title="Enable/disable scheduled emails"></button>
+          </div>
+        </div>
+        <div class="settings-row schedule-detail">
           <div class="settings-key">Frequency</div>
           <div>
             <select id="cfg-frequency" class="form-select" onchange="onFrequencyChange(); saveSchedule()">
@@ -1043,7 +1264,7 @@
             </select>
           </div>
         </div>
-        <div class="settings-row" id="row-week-day" style="display:none">
+        <div class="settings-row schedule-detail" id="row-week-day" style="display:none">
           <div class="settings-key">Day of week</div>
           <div>
             <select id="cfg-week-day" class="form-select" onchange="saveSchedule()">
@@ -1057,7 +1278,7 @@
             </select>
           </div>
         </div>
-        <div class="settings-row" id="row-month-date" style="display:none">
+        <div class="settings-row schedule-detail" id="row-month-date" style="display:none">
           <div class="settings-key">Date of month</div>
           <div>
             <select id="cfg-month-date" class="form-select" onchange="saveSchedule()">
@@ -1065,24 +1286,50 @@
             </select>
           </div>
         </div>
-        <div class="settings-row">
+        <div class="settings-row schedule-detail">
           <div class="settings-key">
             Send time
             <div style="font-size:10px; color:var(--muted); margin-top:2px;">Run Now never sends email</div>
           </div>
-          <div style="display:flex; align-items:center; gap:8px;">
-            <input id="cfg-send-time" type="time" class="form-input" style="width:120px; padding:6px 10px;" onchange="saveSchedule()">
-            <span id="schedule-saved" style="font-size:10px; color:var(--spotify); opacity:0; transition:opacity 0.3s;">saved</span>
+          <div class="editable-cell" id="ec-send-time">
+            <span class="editable-val" id="val-send-time">—</span>
+            <button class="edit-btn" onclick="startEdit('send-time')">Edit</button>
+            <input id="cfg-send-time" type="time" class="editable-input" style="display:none; width:130px;" onkeydown="if(event.key==='Escape')cancelEdit('send-time');if(event.key==='Enter')commitSchedule('send-time')">
+            <button class="save-btn" onclick="commitSchedule('send-time')" style="display:none">Save</button>
+            <button class="cancel-btn" onclick="cancelEdit('send-time')" style="display:none">Cancel</button>
           </div>
         </div>
-        <div class="settings-row">
+        <div class="settings-row schedule-detail">
           <div class="settings-key">Timezone</div>
           <div class="settings-val" id="cfg-timezone">—</div>
         </div>
-        <div class="settings-row">
+        <div class="settings-row schedule-detail">
           <div class="settings-key">Send digest to</div>
-          <div style="display:flex; align-items:center; gap:8px;">
-            <input id="cfg-email" type="email" class="form-input" style="width:220px; padding:6px 10px;" onchange="saveSchedule()">
+          <div class="editable-cell" id="ec-email">
+            <span class="editable-val" id="val-email">—</span>
+            <button class="edit-btn" onclick="startEdit('email')">Edit</button>
+            <input id="cfg-email" type="email" class="editable-input" style="display:none; width:200px;" placeholder="you@example.com" onkeydown="if(event.key==='Escape')cancelEdit('email');if(event.key==='Enter')commitSchedule('email')">
+            <button class="save-btn" onclick="commitSchedule('email')" style="display:none">Save</button>
+            <button class="cancel-btn" onclick="cancelEdit('email')" style="display:none">Cancel</button>
+          </div>
+        </div>
+        <div class="settings-row schedule-detail">
+          <div class="settings-key">Your name</div>
+          <div class="editable-cell" id="ec-user-name">
+            <span class="editable-val" id="val-user-name" style="color:var(--muted)">—</span>
+            <button class="edit-btn" onclick="startEdit('user-name')">Edit</button>
+            <input id="cfg-user-name" type="text" class="editable-input" style="display:none; width:160px;" placeholder="e.g. Dan" onkeydown="if(event.key==='Escape')cancelEdit('user-name');if(event.key==='Enter')commitSchedule('user-name')">
+            <button class="save-btn" onclick="commitSchedule('user-name')" style="display:none">Save</button>
+            <button class="cancel-btn" onclick="cancelEdit('user-name')" style="display:none">Cancel</button>
+          </div>
+        </div>
+        <div class="settings-row schedule-detail">
+          <div class="settings-key">
+            Resend latest digest
+            <div style="font-size:10px;color:var(--muted);margin-top:2px;">Re-delivers the most recent digest to your email</div>
+          </div>
+          <div>
+            <button class="digest-resend-btn" onclick="resendLatestEmail(this)">↩ Resend email</button>
           </div>
         </div>
       </div>
@@ -1102,32 +1349,43 @@
         </div>
       </div>
 
-      <!-- Launch at Login (Electron only) -->
-      <div id="login-item-section" style="display:none; margin-top:24px;">
-        <div style="font-size:11px;color:#e76f51;letter-spacing:3px;text-transform:uppercase;margin-bottom:12px;">System</div>
-        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;color:#333;">
-          <input type="checkbox" id="launch-at-login" onchange="setLaunchAtLogin(this.checked)"
-            style="width:16px;height:16px;accent-color:#e76f51;cursor:pointer;">
-          Launch Music Digest at login
-        </label>
-      </div>
-
       <!-- API Keys (Electron only) -->
-      <div id="api-keys-section" style="display:none; margin-top:28px;">
-        <div style="font-size:11px;color:#e76f51;letter-spacing:3px;text-transform:uppercase;margin-bottom:12px;">Account</div>
-        <div style="margin-bottom:14px;">
-          <label style="font-size:12px;font-weight:600;color:#666;display:block;margin-bottom:4px;">Digest email</label>
-          <div style="display:flex;gap:8px;">
-            <input id="setting-digest-to" type="email" placeholder="you@example.com"
-              style="flex:1;padding:8px 10px;border:1px solid #ddd;border-radius:4px;font-size:14px;">
-            <button onclick="saveConfigSettings()" style="background:#e76f51;color:#fff;border:none;border-radius:4px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;">Save</button>
+      <div id="api-keys-section" class="settings-section" style="display:none;">
+        <div class="settings-section-title">Account</div>
+        <div class="settings-row">
+          <div class="settings-key">
+            Claude API key
+            <div style="font-size:10px;color:var(--muted);margin-top:2px;">(optional) Use your own Anthropic account</div>
+          </div>
+          <div class="editable-cell" id="ec-claude-key">
+            <span class="editable-val" id="val-claude-key" style="color:var(--muted)">Not set</span>
+            <button class="edit-btn" onclick="startEdit('claude-key')">Edit</button>
+            <input id="setting-claude-key" type="password" class="editable-input" style="display:none; width:200px;" placeholder="sk-ant-..." onkeydown="if(event.key==='Escape')cancelEdit('claude-key');if(event.key==='Enter')commitConfig('claude-key')">
+            <button class="save-btn" onclick="commitConfig('claude-key')" style="display:none">Save</button>
+            <button class="cancel-btn" onclick="cancelEdit('claude-key')" style="display:none">Cancel</button>
           </div>
         </div>
-        <div>
-          <label style="font-size:12px;font-weight:600;color:#666;display:block;margin-bottom:4px;">Claude API key <span style="font-weight:400;color:#aaa;">(optional)</span></label>
-          <input id="setting-claude-key" type="password" placeholder="Leave blank to use shared key"
-            style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:4px;font-size:14px;">
-          <div style="font-size:11px;color:#aaa;margin-top:4px;">Only needed if you want to use your own Anthropic account.</div>
+      </div>
+
+      <!-- System (Electron only, bottom of page) -->
+      <div id="login-item-section" class="settings-section" style="display:none;">
+        <div class="settings-section-title">System</div>
+        <div class="settings-row">
+          <div class="settings-key">
+            Auto-open log on run
+            <div style="font-size:10px;color:var(--muted);margin-top:2px;">Opens the log panel automatically when a digest runs</div>
+          </div>
+          <div>
+            <input type="checkbox" id="log-auto-open" onchange="toggleLogAutoOpen(this)"
+              style="width:16px;height:16px;accent-color:var(--coral);cursor:pointer;">
+          </div>
+        </div>
+        <div class="settings-row">
+          <div class="settings-key">Launch at login</div>
+          <div>
+            <input type="checkbox" id="launch-at-login" onchange="setLaunchAtLogin(this.checked)"
+              style="width:16px;height:16px;accent-color:var(--coral);cursor:pointer;">
+          </div>
         </div>
       </div>
     </div>
@@ -1141,14 +1399,18 @@
 <button id="log-toggle-btn" onclick="toggleLogPanel()">Log</button>
 
 <!-- Log Panel -->
+<audio id="preview-audio"></audio>
 <div id="log-panel">
+  <div class="log-resize-handle" id="log-resize-handle"></div>
   <div class="log-panel-header">
-    <span class="log-panel-tag">Run Log</span>
-    <div class="log-run-status">
-      <div class="log-run-dot" id="log-run-dot"></div>
-      <span id="log-run-text">Idle</span>
+    <button class="log-close-btn" onclick="closeLogPanel()">✕<span class="log-close-arrow">→</span></button>
+    <div class="log-panel-right">
+      <span class="log-panel-tag">Run Log</span>
+      <div class="log-run-status">
+        <div class="log-run-dot" id="log-run-dot"></div>
+        <span id="log-run-text">Idle</span>
+      </div>
     </div>
-    <button class="log-close-btn" onclick="closeLogPanel()">✕</button>
   </div>
   <div id="log-output"></div>
 </div>
@@ -1170,7 +1432,12 @@ function navigateTo(page) {
 }
 
 document.querySelectorAll('.nav-item').forEach(el => {
-  el.addEventListener('click', () => navigateTo(el.dataset.page));
+  el.addEventListener('click', () => {
+    const page = el.dataset.page;
+    navigateTo(page);
+    // Always reload the digest tab so clicking Today clears any historical view
+    if (page === 'digest') loadDigest();
+  });
 });
 
 // ─── TOAST ────────────────────────────────────────────────────
@@ -1184,9 +1451,19 @@ function toast(msg) {
 }
 
 // ─── STATUS ───────────────────────────────────────────────────
+let _userName = '';
+
+function timeGreeting() {
+  const h = new Date().getHours();
+  if (h < 12) return 'morning';
+  if (h < 18) return 'afternoon';
+  return 'evening';
+}
+
 async function loadStatus() {
   try {
     const s = await api('/api/status');
+    _userName = s.userName || '';
     const dot = $('spotify-dot');
     const txt = $('spotify-status-text');
     if (s.spotify.connected) {
@@ -1199,19 +1476,44 @@ async function loadStatus() {
 }
 
 // ─── DIGEST ───────────────────────────────────────────────────
-async function loadDigest() {
-  const digest = await api('/api/digest/latest');
-  const el = $('digest-content');
+let _latestDigest = null;
 
-  if (!digest) {
-    el.innerHTML = `
-      <div class="empty-state">
-        <div class="icon">◈</div>
-        <div class="title">No digest yet</div>
-        <div class="desc">Click <strong>▶ Run Now</strong> in the sidebar to generate your first digest.<br>Or wait for the scheduled 8am run.</div>
-      </div>`;
-    return;
+async function loadDigest() {
+  _latestDigest = await api('/api/digest/latest');
+  if (_latestDigest) {
+    renderDigest(_latestDigest);
+  } else {
+    showDigestPrompt();
   }
+}
+
+function showDigestPrompt() {
+  const el = $('digest-content');
+  const lastScanLink = _latestDigest
+    ? ` or <button onclick="showLastScan()" style="background:none;border:none;color:var(--peach);font-family:var(--font-display);font-weight:700;font-size:15px;cursor:pointer;padding:0;text-decoration:underline;text-underline-offset:3px;">view last scan</button>`
+    : '';
+
+  const greetingBlock = _userName ? `
+    <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:3px;color:var(--peach);text-transform:uppercase;margin-bottom:18px;opacity:0.35;">Good ${timeGreeting()}</div>
+    <div style="font-family:'Playfair Display',Georgia,serif;font-weight:900;font-style:italic;font-size:clamp(56px,9vw,108px);color:var(--text2);opacity:0.5;letter-spacing:-2px;line-height:0.95;margin-bottom:40px;">${esc(_userName)}</div>
+  ` : `
+    <div style="font-family:var(--font-display);font-weight:900;font-size:clamp(28px,4vw,52px);color:var(--text);margin-bottom:24px;letter-spacing:-1px;">No recent scan</div>
+  `;
+
+  el.innerHTML = `
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:70vh;text-align:center;padding:var(--s5);">
+      ${greetingBlock}
+      <div style="color:var(--text2);font-size:15px;line-height:2;font-weight:300;max-width:480px;">
+        Hit <button onclick="triggerRun()" style="background:none;border:none;color:var(--coral);font-family:var(--font-display);font-weight:700;font-size:15px;cursor:pointer;padding:0;text-decoration:underline;text-underline-offset:3px;">run scan</button> for a fresh digest${lastScanLink}
+      </div>
+    </div>`;
+}
+
+function triggerRun() { $('run-btn').click(); }
+function showLastScan() { if (_latestDigest) renderDigest(_latestDigest); }
+
+function renderDigest(digest) {
+  const el = $('digest-content');
 
   // Check for URL params
   const params = new URLSearchParams(location.search);
@@ -1263,7 +1565,7 @@ async function loadDigest() {
         <div class="artist-ordinal">${String(i + 1).padStart(2, '0')}</div>
         <div>
           <div class="artist-name">${esc(a.name)}</div>
-          <div class="artist-reason">${esc(a.reason)}</div>
+          <div class="artist-reason">${formatReason(a.reason)}</div>
           ${badges.length ? `<div class="signal-badges">${badges.join('')}</div>` : ''}
         </div>
       </div>`;
@@ -1287,7 +1589,7 @@ async function loadDigest() {
         <div class="artist-ordinal">${String(i + 1).padStart(2, '0')}</div>
         <div>
           <div class="artist-name">${esc(a.name)}</div>
-          <div class="artist-reason">${esc(a.reason)}</div>
+          <div class="artist-reason">${formatReason(a.reason)}</div>
         </div>
       </div>`).join('')}</div>`;
 
@@ -1300,11 +1602,26 @@ async function loadDigest() {
       : s.tier === 'rising'
         ? '<span class="tier-label tier-label-rising">rising</span>'
         : '';
+    const spotifyHref = s.spotify_id
+      ? `https://open.spotify.com/track/${esc(s.spotify_id)}`
+      : `https://open.spotify.com/search/${encodeURIComponent((s.title || '') + ' ' + (s.artist || ''))}`;
+    const spotifyIcon = `<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>`;
+    const playIcon  = `<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>`;
+    const pauseIcon = `<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>`;
+    const listenBtn = s.preview_url
+      ? `<td class="song-listen"><button class="song-play-btn" data-preview="${esc(s.preview_url)}" data-play-icon='${playIcon}' data-pause-icon='${pauseIcon}' onclick="togglePreview(this)" title="Preview (30s)">${playIcon}</button></td>`
+      : `<td class="song-listen"><a href="${spotifyHref}" target="_blank" rel="noopener" title="Open on Spotify">${spotifyIcon}</a></td>`;
+    const chartBadges = [
+      s.lfm_rank    ? `<span class="song-badge song-badge-lfm">lfm #${s.lfm_rank}</span>`       : '',
+      s.genius_rank ? `<span class="song-badge song-badge-genius">genius #${s.genius_rank}</span>` : '',
+    ].filter(Boolean).join('');
+    const signalLine = chartBadges ? `<div class="song-signal">${chartBadges}</div>` : '';
     return `
     <tr>
       <td class="song-num">${String(i + 1).padStart(2, '0')}${tierLabel}</td>
-      <td class="song-title">${esc(s.title)}${sourceLine}</td>
+      <td class="song-title">${esc(s.title)}${sourceLine}${signalLine}</td>
       <td class="song-artist">${esc(s.artist)}</td>
+      ${listenBtn}
     </tr>`;
   }).join('');
 
@@ -1328,8 +1645,13 @@ async function loadDigest() {
         <a href="/auth/spotify" class="strip-link">Connect Spotify to build your playlist →</a>
       </div>`;
 
+  const greetingHtml = _userName
+    ? `<div class="digest-greeting">Good ${timeGreeting()}, <strong>${esc(_userName)}</strong></div>`
+    : '';
+
   el.innerHTML = `
     ${banner}
+    ${greetingHtml}
     <div class="digest-hero">
       <div class="issue-number">#${issueNum}</div>
       <div class="issue-meta">
@@ -1372,9 +1694,62 @@ async function loadDigest() {
   });
 }
 
+// ─── SONG PREVIEW ─────────────────────────────────────────────
+const _audio = document.getElementById('preview-audio');
+let _playingBtn = null;
+
+function togglePreview(btn) {
+  const url = btn.dataset.preview;
+
+  if (_playingBtn && _playingBtn !== btn) {
+    _playingBtn.classList.remove('playing');
+    _playingBtn.innerHTML = _playingBtn.dataset.playIcon;
+  }
+
+  if (_playingBtn === btn && !_audio.paused) {
+    _audio.pause();
+    btn.classList.remove('playing');
+    btn.innerHTML = btn.dataset.playIcon;
+    _playingBtn = null;
+    return;
+  }
+
+  if (_audio.src !== url) _audio.src = url;
+  _audio.play();
+  btn.classList.add('playing');
+  btn.innerHTML = btn.dataset.pauseIcon;
+  _playingBtn = btn;
+
+  _audio.onended = () => {
+    btn.classList.remove('playing');
+    btn.innerHTML = btn.dataset.playIcon;
+    _playingBtn = null;
+  };
+}
+
+async function resendLatestEmail(btn) {
+  const orig = btn.textContent;
+  btn.textContent = 'Sending…';
+  btn.disabled = true;
+  try {
+    const digest = await api('/api/digest/latest');
+    if (!digest) { toast('No digest found'); return; }
+    await api(`/api/digests/${digest.date}/resend`, 'POST');
+    toast('Email sent');
+  } catch (err) {
+    toast('Failed: ' + err.message);
+  } finally {
+    btn.textContent = orig;
+    btn.disabled = false;
+  }
+}
+
 // ─── HISTORY ──────────────────────────────────────────────────
+let _historyDigests = [];
+
 async function loadHistory() {
   const { digests } = await api('/api/digests');
+  _historyDigests = digests;
   const el = $('history-content');
   if (!digests.length) {
     el.innerHTML = `<div class="empty-state"><div class="icon">≡</div><div class="title">No history yet</div></div>`;
@@ -1385,16 +1760,33 @@ async function loadHistory() {
     <div class="history-items">
       ${digests.map(d => `
         <div class="history-card" onclick="viewDigest('${d.date}')">
-          <div class="history-date">${d.date}</div>
-          <div class="history-artists">${d.artists.slice(0, 4).map(a => a.name).join(', ') || '—'}</div>
-          <div class="history-count">${d.songs.length} tracks</div>
+          <div class="history-date">${formatDate(d.date)}</div>
+          <div class="history-artists">${d.artists.slice(0, 4).map(a => esc(a.name)).join(', ') || '—'}</div>
+          <div class="history-count">${d.artists.length} artists · ${d.songs.length} tracks</div>
         </div>`).join('')}
     </div>`;
 }
 
 function viewDigest(date) {
-  toast(`Loading ${date}...`);
-  // TODO: expand in-place or navigate to a detail view
+  const digest = _historyDigests.find(d => d.date === date);
+  if (!digest) { toast('Could not find that digest'); return; }
+
+  // Switch to digest page without triggering the nav listener (no loadDigest call)
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  const navEl = document.querySelector('.nav-item[data-page="digest"]');
+  if (navEl) navEl.classList.add('active');
+  $('page-digest').classList.add('active');
+  localStorage.setItem('activePage', 'digest');
+
+  renderDigest(digest);
+
+  // Prepend the "viewing historical" strip
+  const el = $('digest-content');
+  const strip = document.createElement('div');
+  strip.className = 'history-nav-strip';
+  strip.innerHTML = `<span>← ${formatDate(date)}</span><button onclick="loadDigest()">Today →</button>`;
+  el.insertBefore(strip, el.firstChild);
 }
 
 // ─── SOURCES ──────────────────────────────────────────────────
@@ -1483,18 +1875,88 @@ function onFrequencyChange() {
   $('row-month-date').style.display = freq === 'monthly' ? '' : 'none';
 }
 
-async function saveSchedule() {
-  const sendTime  = $('cfg-send-time').value;
-  if (!sendTime) return; // loadSettings hasn't populated fields yet — skip
+// ─── EDIT-IN-PLACE ────────────────────────────────────────────
+const _editBackup = {};
+
+function startEdit(field) {
+  const cell      = document.getElementById('ec-' + field);
+  const val       = cell.querySelector('.editable-val');
+  const inp       = cell.querySelector('.editable-input');
+  const editBtn   = cell.querySelector('.edit-btn');
+  const saveBtn   = cell.querySelector('.save-btn');
+  const cancelBtn = cell.querySelector('.cancel-btn');
+  _editBackup[field] = inp.value;
+  val.style.display     = 'none';
+  editBtn.style.display = 'none';
+  inp.style.display     = 'inline-block';
+  saveBtn.style.display = 'inline-block';
+  cancelBtn.style.display = 'inline-block';
+  inp.focus();
+  if (inp.type !== 'password') inp.select();
+}
+
+function cancelEdit(field) {
+  const cell = document.getElementById('ec-' + field);
+  const inp  = cell.querySelector('.editable-input');
+  inp.value = _editBackup[field] ?? inp.value;
+  cell.querySelector('.editable-val').style.display     = '';
+  cell.querySelector('.edit-btn').style.display         = '';
+  inp.style.display                                     = 'none';
+  cell.querySelector('.save-btn').style.display         = 'none';
+  cell.querySelector('.cancel-btn').style.display       = 'none';
+}
+
+async function commitSchedule(field) {
+  const cell = document.getElementById('ec-' + field);
+  const val  = cell.querySelector('.editable-val');
+  const sendTime  = $('cfg-send-time').value || '08:00';
   const frequency = $('cfg-frequency').value;
   const weekDay   = parseInt($('cfg-week-day').value, 10);
   const monthDate = parseInt($('cfg-month-date').value, 10);
   const digestTo  = $('cfg-email').value.trim();
+  const userName  = $('cfg-user-name').value.trim();
   try {
-    await api('/api/settings/schedule', 'POST', { sendTime, frequency, weekDay, monthDate, digestTo });
-    const saved = $('schedule-saved');
-    saved.style.opacity = '1';
-    setTimeout(() => saved.style.opacity = '0', 2000);
+    await api('/api/settings/schedule', 'POST', { sendTime, frequency, weekDay, monthDate, digestTo, userName });
+    if (field === 'send-time') val.textContent = sendTime;
+    if (field === 'email') val.textContent = digestTo || '—';
+    if (field === 'user-name') {
+      val.textContent = userName || '—';
+      val.style.color = userName ? '' : 'var(--muted)';
+      updateGreeting(userName);
+    }
+    cancelEdit(field);
+    toast('Saved');
+  } catch (err) {
+    toast('Failed to save: ' + err.message);
+  }
+}
+
+async function commitConfig(field) {
+  const cell = document.getElementById('ec-' + field);
+  const val  = cell.querySelector('.editable-val');
+  try {
+    const claudeApiKey = $('setting-claude-key').value.trim();
+    await api('/api/settings/config', 'POST', { claudeApiKey: claudeApiKey || undefined });
+    val.textContent = claudeApiKey ? '••••• (set)' : 'Not set';
+    val.style.color = claudeApiKey ? 'var(--text)' : 'var(--muted)';
+    $('setting-claude-key').value = '';
+    cancelEdit(field);
+    toast('Saved');
+  } catch (err) {
+    toast('Failed to save: ' + err.message);
+  }
+}
+
+async function saveSchedule() {
+  const sendTime  = $('cfg-send-time').value || '08:00';
+  const frequency = $('cfg-frequency').value;
+  const weekDay   = parseInt($('cfg-week-day').value, 10);
+  const monthDate = parseInt($('cfg-month-date').value, 10);
+  const digestTo  = $('cfg-email').value.trim();
+  const userName  = $('cfg-user-name').value.trim();
+  try {
+    await api('/api/settings/schedule', 'POST', { sendTime, frequency, weekDay, monthDate, digestTo, userName });
+    updateGreeting(userName);
   } catch (err) {
     toast('Failed to save settings: ' + err.message);
   }
@@ -1566,6 +2028,29 @@ $('src-type').addEventListener('change', function() {
 });
 
 // ─── SETTINGS ─────────────────────────────────────────────────
+function updateGreeting(name) {
+  _userName = name || '';
+}
+
+function applyScheduleCollapse(isEnabled) {
+  const section = $('schedule-enabled-toggle').closest('.settings-section');
+  section.classList.toggle('schedule-collapsed', !isEnabled);
+}
+
+async function toggleScheduleEnabled(btn) {
+  const nowOn = btn.classList.toggle('on');
+  applyScheduleCollapse(nowOn);
+  await api('/api/settings/schedule', 'POST', {
+    sendTime: $('cfg-send-time').value || '08:00',
+    enabled: nowOn,
+  });
+  toast(nowOn ? 'Scheduled emails enabled' : 'Scheduled emails paused');
+}
+
+function toggleLogAutoOpen(checkbox) {
+  localStorage.setItem('logAutoOpen', checkbox.checked ? 'true' : 'false');
+}
+
 async function loadSettings() {
   const [s, status] = await Promise.all([api('/api/settings'), api('/api/status')]);
   $('cfg-send-time').value  = s.sendTime || '08:00';
@@ -1573,8 +2058,18 @@ async function loadSettings() {
   $('cfg-week-day').value   = String(s.weekDay ?? 5);
   $('cfg-month-date').value = String(s.monthDate ?? 1);
   $('cfg-email').value      = s.email || '';
-  const digestToEl = document.getElementById('setting-digest-to');
-  if (digestToEl && s.email) digestToEl.value = s.email;
+  $('cfg-user-name').value  = s.userName || '';
+  // Populate display spans
+  document.getElementById('val-send-time').textContent = s.sendTime || '08:00';
+  document.getElementById('val-email').textContent     = s.email || '—';
+  const nameValEl = document.getElementById('val-user-name');
+  nameValEl.textContent = s.userName || '—';
+  nameValEl.style.color = s.userName ? 'var(--text)' : 'var(--muted)';
+  const toggle = $('schedule-enabled-toggle');
+  const schedEnabled = s.scheduleEnabled !== false;
+  if (toggle) toggle.classList.toggle('on', schedEnabled);
+  applyScheduleCollapse(schedEnabled);
+  updateGreeting(s.userName);
   onFrequencyChange();
   $('cfg-timezone').textContent = s.timezone || '—';
   $('cfg-tracks').textContent    = status.tracksInPlaylist ?? '—';
@@ -1607,20 +2102,6 @@ async function setLaunchAtLogin(enabled) {
   toast(enabled ? 'Will launch at login' : 'Login launch disabled');
 }
 
-async function saveConfigSettings() {
-  const digestTo = document.getElementById('setting-digest-to').value.trim();
-  const claudeApiKey = document.getElementById('setting-claude-key').value.trim();
-  if (digestTo && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(digestTo)) {
-    toast('Invalid email address'); return;
-  }
-  if (!digestTo && !claudeApiKey) {
-    toast('Nothing to save');
-    return;
-  }
-  await api('/api/settings/config', 'POST', { digestTo: digestTo || undefined, claudeApiKey: claudeApiKey || undefined });
-  toast('Saved');
-  document.getElementById('setting-claude-key').value = '';
-}
 
 // ─── LOG PANEL ────────────────────────────────────────────────
 let _logEs = null;
@@ -1667,9 +2148,32 @@ function addSectionHeader(title) {
   if (atBottom) out.scrollTop = out.scrollHeight;
 }
 
+const _phaseLabels = {
+  'Scraping': 'Scraping',
+  'Scoring': 'Scoring',
+  'Claude': 'Digesting',
+  'Spotify': 'Building playlist',
+  'Saving': 'Saving',
+};
+
+function setPhaseStatus(phase) {
+  const el = $('run-phase-status');
+  if (!el) return;
+  if (phase) {
+    const label = _phaseLabels[phase] || (phase.toLowerCase());
+    el.innerHTML = label + '<span class="phase-dots"></span>';
+    el.classList.add('visible');
+  } else {
+    el.innerHTML = '';
+    el.classList.remove('visible');
+  }
+}
+
 function addLogLine(level, msg) {
   if (msg.startsWith('[PHASE] ')) {
-    addSectionHeader(msg.slice(8).toUpperCase());
+    const phase = msg.slice(8).trim();
+    setPhaseStatus(phase);
+    addSectionHeader(phase.toUpperCase());
     return;
   }
 
@@ -1719,6 +2223,7 @@ function connectLogStream() {
         resolveReady();
       } else if (level === 'done') {
         setRunStatus('done', 'Complete');
+        setPhaseStatus(null);
         const div = document.createElement('div');
         div.className = 'log-complete';
         const label = document.createElement('span');
@@ -1748,7 +2253,8 @@ $('run-btn').addEventListener('click', async () => {
   btn.disabled = true;
   btn.innerHTML = '<span class="loader"></span> Running...';
 
-  openLogPanel();
+  setRunStatus('running', 'Running...');
+  if (localStorage.getItem('logAutoOpen') !== 'false') openLogPanel();
   const { done } = await connectLogStream();
 
   // Fire the run — don't await it; completion is signalled via SSE done event
@@ -1764,8 +2270,10 @@ $('run-btn').addEventListener('click', async () => {
     toast('Digest complete!');
     btn.disabled = false;
     btn.innerHTML = '▶ Run Now';
-    await loadDigest();
+    _latestDigest = await api('/api/digest/latest');
+    renderDigest(_latestDigest);
     loadStatus();
+    setTimeout(() => setRunStatus('idle', 'Idle'), 3000);
   } catch (err) {
     toast('Error: ' + err.message);
     setRunStatus('error', 'Error');
@@ -1788,6 +2296,18 @@ function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+function formatReason(text) {
+  if (!text) return '';
+  let s = esc(text);
+  // upvote counts: 864↑ or 1.2k↑
+  s = s.replace(/([\d,.]+k?)\s*↑/gi,
+    '<span style="color:#e76f51;font-family:\'IBM Plex Mono\',monospace;font-size:10px;font-weight:600;">$1↑</span>');
+  // comment counts: 643💬
+  s = s.replace(/([\d,.]+k?)\s*💬/g,
+    '<span style="color:#2a9d8f;font-family:\'IBM Plex Mono\',monospace;font-size:10px;font-weight:600;">$1 cmt</span>');
+  return s;
+}
+
 function formatDate(str) {
   if (!str) return '—';
   const d = new Date(str + 'T12:00:00Z');
@@ -1797,11 +2317,83 @@ function formatDate(str) {
 // ─── INIT ─────────────────────────────────────────────────────
 const savedPage = localStorage.getItem('activePage') || 'digest';
 navigateTo(savedPage);
-if (savedPage !== 'digest') loadDigest(); // always pre-load digest data for the sidebar status
-loadStatus();
+loadStatus().then(loadDigest);
+
 loadElectronSettings();
-// Log panel: restore saved preference, default hidden on first run
+// Log panel: restore saved preferences
 if (localStorage.getItem('logPanelVisible') === 'true') setLogPanelVisible(true);
+const _logAutoCheckbox = document.getElementById('log-auto-open');
+if (_logAutoCheckbox) _logAutoCheckbox.checked = localStorage.getItem('logAutoOpen') !== 'false';
+
+// Log panel drag-to-resize
+(function() {
+  const panel  = $('log-panel');
+  const handle = $('log-resize-handle');
+  const MIN_W  = 240, MAX_W = 680;
+  let startX, startW;
+
+  const savedW = parseInt(localStorage.getItem('logPanelWidth') || '400', 10);
+  panel.style.width = savedW + 'px';
+
+  handle.addEventListener('mousedown', e => {
+    e.preventDefault();
+    startX = e.clientX;
+    startW = panel.offsetWidth;
+    handle.classList.add('dragging');
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+
+  function onMove(e) {
+    const w = Math.min(MAX_W, Math.max(MIN_W, startW - (e.clientX - startX)));
+    panel.style.width = w + 'px';
+  }
+
+  function onUp() {
+    handle.classList.remove('dragging');
+    localStorage.setItem('logPanelWidth', panel.offsetWidth);
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+  }
+})();
+
+// ── Update check ──────────────────────────────────────────────
+const APP_VERSION   = '1.0.0';
+const VERSION_URL   = 'https://raw.githubusercontent.com/gleyzeddonut/music-digest/main/version.json';
+
+function semverGt(a, b) {
+  const pa = a.split('.').map(Number);
+  const pb = b.split('.').map(Number);
+  for (let i = 0; i < 3; i++) {
+    if (pa[i] > pb[i]) return true;
+    if (pa[i] < pb[i]) return false;
+  }
+  return false;
+}
+
+async function checkForUpdate() {
+  try {
+    const res = await fetch(VERSION_URL);
+    if (!res.ok) return;
+    const { version, downloadUrl } = await res.json();
+    if (semverGt(version, APP_VERSION)) {
+      const link = document.getElementById('update-bar-link');
+      link.textContent = `v${version} — Download`;
+      link.href = downloadUrl;
+      document.getElementById('update-bar').style.display = 'flex';
+    }
+  } catch {}
+}
+
+checkForUpdate();
+
+// Prevent log scroll from bleeding into the page
+$('log-output').addEventListener('wheel', e => {
+  const el = $('log-output');
+  const atTop    = el.scrollTop === 0 && e.deltaY < 0;
+  const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1 && e.deltaY > 0;
+  if (atTop || atBottom) e.preventDefault();
+}, { passive: false });
 </script>
 </body>
 </html>
