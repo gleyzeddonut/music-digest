@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Tray, Menu, nativeImage, shell, globalShortcut } = require('electron');
+const { app, BrowserWindow, Tray, Menu, nativeImage, shell, globalShortcut, MenuItem } = require('electron');
 const path = require('path');
 
 let mainWindow = null;
@@ -33,6 +33,27 @@ function showWindow() {
   if (mainWindow.isMinimized()) mainWindow.restore();
   mainWindow.show();
   mainWindow.focus();
+}
+
+// ── App menu ──────────────────────────────────────────────────
+// Override the default Quit menu item so isQuitting is set synchronously
+// before app.quit() fires close events — fixes Cmd+Q and Dock → Quit.
+function buildAppMenu() {
+  const quit = new MenuItem({
+    label: 'Quit Music Digest',
+    accelerator: 'CmdOrCtrl+Q',
+    click: () => { isQuitting = true; app.quit(); },
+  });
+  const template = Menu.getApplicationMenu()?.items.map(item => {
+    if (item.role === 'appmenu' || item.label === app.name) {
+      return new MenuItem({
+        label: item.label,
+        submenu: [...(item.submenu?.items.filter(i => i.role !== 'quit') ?? []), quit],
+      });
+    }
+    return item;
+  }) ?? [{ label: app.name, submenu: [quit] }];
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
 // ── Tray ──────────────────────────────────────────────────────
@@ -113,6 +134,7 @@ if (!gotLock) {
     const { getConfig } = require('./config-store');
     const setupNeeded = !getConfig('digest_to');
 
+    buildAppMenu();
     createWindow(setupNeeded);
     createTray();
 
