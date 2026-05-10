@@ -116,7 +116,7 @@ Writing style for the summary:
 
 Respond with valid JSON only, no markdown, no explanation:
 {
-  "summary": "5-8 bullets, one per line separated by \\\\n. Each starts with '• '. One story per bullet. Example: '• Kendrick Lamar topped Apple Charts this week.\\\\n• Megan Thee Stallion released a surprise EP on Friday.'",
+  "summary": "5-8 bullets, one per line separated by \\n. Each starts with '• '. One story per bullet. Example: '• Kendrick Lamar topped Apple Charts this week.\\n• Megan Thee Stallion released a surprise EP on Friday.'",
   "artists": [
     {"name": "string", "tier": "breaking|rising", "reason": "1-2 sentences: what specifically is driving attention, cite sources/numbers"}
   ],

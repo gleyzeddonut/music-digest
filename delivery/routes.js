@@ -23,7 +23,6 @@ function persistSetupConfig(digestTo, claudeApiKey, userName) {
   if (userName) set('user_name', userName);
 
   process.env.DIGEST_TO = digestTo;
-  if (claudeApiKey) process.env.CLAUDE_API_KEY = claudeApiKey;
 }
 
 // ── Log streaming ─────────────────────────────────────────────
@@ -92,12 +91,7 @@ router.post('/api/settings/config', (req, res) => {
     process.env.DIGEST_TO = digestTo.trim();
   }
   if (claudeApiKey !== undefined) {
-    if (claudeApiKey.trim()) {
-      configStore.setConfig('claude_api_key', claudeApiKey.trim());
-      process.env.CLAUDE_API_KEY = claudeApiKey.trim();
-    } else {
-      configStore.setConfig('claude_api_key', null);
-    }
+    configStore.setConfig('claude_api_key', claudeApiKey.trim() || null);
   }
   res.json({ ok: true });
 });
