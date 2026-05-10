@@ -1,22 +1,16 @@
 'use strict';
 
-const axios = require('axios');
-const config = require('../config');
-
-const BASE = 'https://ws.audioscrobbler.com/2.0/';
+const supabase = require('../supabase-client');
 
 async function lastfmGet(method, extra = {}) {
-  const key = config.LASTFM_API_KEY;
-  if (!key) {
-    console.warn('[lastfm] LASTFM_API_KEY not set — skipping');
-    return null;
-  }
   try {
-    const { data } = await axios.get(BASE, {
-      timeout: 10000,
-      params: { method, api_key: key, format: 'json', limit: 50, ...extra },
+    const res = await fetch(`${supabase.url}/functions/v1/lastfm-proxy`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: supabase.anonKey },
+      body: JSON.stringify({ method, limit: 50, ...extra }),
+      signal: AbortSignal.timeout(10000),
     });
-    return data;
+    return res.ok ? res.json() : null;
   } catch (err) {
     console.warn(`[lastfm] ${method} failed: ${err.message}`);
     return null;

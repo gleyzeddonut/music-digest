@@ -96,7 +96,10 @@
   <div class="card">
     <div class="logo">Music Digest</div>
     <h1>Welcome</h1>
-    <p class="subtitle">Enter your email address to start receiving your daily music briefing.</p>
+    <p class="subtitle">Quick setup — your daily music briefing will be ready in seconds.</p>
+
+    <label for="name">Your name</label>
+    <input type="text" id="name" placeholder="e.g. Dan" autocomplete="given-name">
 
     <label for="email">Your email address</label>
     <input type="email" id="email" placeholder="you@example.com" autocomplete="email">
@@ -127,10 +130,11 @@
       btn.textContent = 'Saving…';
 
       try {
+        const name = document.getElementById('name').value.trim();
         const res = await fetch('/api/setup', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ digestTo: email, claudeApiKey: apiKey }),
+          body: JSON.stringify({ digestTo: email, claudeApiKey: apiKey, userName: name }),
         });
         if (!res.ok) {
           const j = await res.json();

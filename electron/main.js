@@ -38,8 +38,8 @@ function showWindow() {
 // ── Tray ──────────────────────────────────────────────────────
 
 function createTray() {
-  const iconPath = path.join(__dirname, '..', 'assets', 'iconTemplate.png');
-  const icon = nativeImage.createFromPath(iconPath);
+  const iconPath = path.join(__dirname, '..', 'visuals', 'menuitemTemplate.png');
+  const icon = nativeImage.createFromPath(iconPath).resize({ width: 22, height: 22 });
   tray = new Tray(icon);
   tray.setToolTip('Music Digest');
   // Menu is built once; send time label reflects value at launch, not live updates

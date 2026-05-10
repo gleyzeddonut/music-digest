@@ -6,7 +6,9 @@ const { scrapeSpotifyPlaylists } = require('../scraper/spotifyPlaylist');
 const { scrapeAppleCharts } = require('../scraper/appleCharts');
 const { scrapeLastfm } = require('../scraper/lastfm');
 const { scrapeGenius } = require('../scraper/genius');
-const { score } = require('./scorer');
+const { scrapeKworbShazam, scrapeKworbSpotify } = require('../scraper/kworb');
+const { scrapeHypem } = require('../scraper/hypem');
+const { score, normalizeArtist, normalizeTrack } = require('./scorer');
 const { processWithClaude } = require('./claude');
 const { appendSongsToPlaylist } = require('./spotify');
 const { sendDigestEmail } = require('../delivery/email');
@@ -41,7 +43,7 @@ async function runDigest(opts = {}) {
   console.log(`[digest] ${redditSources.length} subreddits · ${webSources.length} web sources · ${tiktokSources.length} TikTok · ${playlistSources.length} Spotify playlists`);
 
   // 2. Scrape in parallel
-  const [redditData, webData, tiktokData, playlistData, appleCharts, lastfmData, geniusTrending] = await Promise.all([
+  const [redditData, webData, tiktokData, playlistData, appleCharts, lastfmData, geniusTrending, shazamChart, spotifyChart, hypemData] = await Promise.all([
     scrapeReddit(redditSources),
     scrapeWeb(webSources),
     scrapeTikTok(tiktokSources),
@@ -49,7 +51,12 @@ async function runDigest(opts = {}) {
     scrapeAppleCharts(),
     scrapeLastfm(),
     scrapeGenius(),
+    scrapeKworbShazam(),
+    scrapeKworbSpotify(),
+    scrapeHypem(),
   ]);
+
+  console.log(`[digest] Shazam: ${shazamChart.length} · Spotify global: ${spotifyChart.length} · Hype Machine: ${hypemData.length} · TikTok: ${tiktokData.reduce((n,t)=>n+t.items.length,0)}`);
 
   const totalItems = redditData.reduce((n, r) => n + r.posts.length, 0)
     + webData.reduce((n, w) => n + w.items.length, 0)
@@ -62,7 +69,7 @@ async function runDigest(opts = {}) {
   }
 
   console.log('[PHASE] Scoring');
-  const scoredData = score(redditData, webData, appleCharts, lastfmData.artists, geniusTrending);
+  const scoredData = score(redditData, webData, appleCharts, lastfmData.artists, geniusTrending, lastfmData.tracks, shazamChart, spotifyChart, hypemData);
 
   console.log('[PHASE] Claude');
   console.log(`[digest] Scraped ${totalItems} total items. Sending to Claude...`);
@@ -88,6 +95,10 @@ async function runDigest(opts = {}) {
   const matched = result.headlines.filter(h => h.url).length;
   console.log(`[digest] Headlines resolved: ${matched}/${result.headlines.length} with URLs`);
 
+  // Score songs against chart data and sort by signal strength
+  result.songs = scoreSongs(result.songs || [], lastfmData.tracks, geniusTrending, shazamChart, spotifyChart);
+  console.log(`[digest] Song scores: ${result.songs.map(s => `${s.title}(${s.song_score.toFixed(2)})`).join(', ')}`);
+
   // Merge scorer sub-scores into Claude's artist output for UI badge rendering
   const scorerIndex = {};
   for (const s of [...scoredData.breaking, ...scoredData.rising]) {
@@ -109,6 +120,14 @@ async function runDigest(opts = {}) {
     playlistUrl = spotifyResult.playlistUrl;
     spotifyAdded = spotifyResult.added;
     spotifyUnmatched = spotifyResult.unmatched;
+
+    // Attach Spotify track IDs to songs so the UI can link directly to tracks
+    const addedByTitle = {};
+    for (const a of spotifyAdded) addedByTitle[(a.title || '').toLowerCase()] = a;
+    result.songs = (result.songs || []).map(s => {
+      const match = addedByTitle[(s.title || '').toLowerCase()];
+      return match ? { ...s, spotify_id: match.id, preview_url: match.preview_url || null } : s;
+    });
   }
 
   // 6. Save to DB
@@ -144,6 +163,51 @@ async function runDigest(opts = {}) {
     spotifyUnmatched,
     emailSent,
   };
+}
+
+function buildChartMap(tracks) {
+  const map = new Map();
+  for (const t of tracks) {
+    const full  = normalizeTrack(t.title) + '|' + normalizeArtist(t.artist);
+    const title = normalizeTrack(t.title);
+    if (!map.has(full))  map.set(full,  t.rank);
+    if (!map.has(title)) map.set(title, t.rank);
+  }
+  return map;
+}
+
+function scoreSongs(songs, lastfmTracks = [], geniusTrending = [], shazamChart = [], spotifyChart = []) {
+  const lfmMap     = buildChartMap(lastfmTracks);
+  const geniusMap  = buildChartMap(geniusTrending);
+  const shazamMap  = buildChartMap(shazamChart);
+  const spotifyMap = buildChartMap(spotifyChart);
+
+  return songs.map(s => {
+    const titleNorm  = normalizeTrack(s.title);
+    const artistNorm = normalizeArtist(s.artist);
+    const fullKey    = titleNorm + '|' + artistNorm;
+
+    const lfmRank     = lfmMap.get(fullKey)     ?? lfmMap.get(titleNorm)     ?? null;
+    const geniusRank  = geniusMap.get(fullKey)  ?? geniusMap.get(titleNorm)  ?? null;
+    const shazamRank  = shazamMap.get(fullKey)  ?? shazamMap.get(titleNorm)  ?? null;
+    const spotifyRank = spotifyMap.get(fullKey) ?? spotifyMap.get(titleNorm) ?? null;
+    const sourceCount = s.sources?.length || 0;
+
+    // Shazam weighted highest (leading indicator), others equal
+    let song_score = 0;
+    if (shazamRank)  song_score += 0.35 * (1 - (shazamRank  - 1) / 49);
+    if (geniusRank)  song_score += 0.25 * (1 - (geniusRank  - 1) / 49);
+    if (lfmRank)     song_score += 0.20 * (1 - (lfmRank      - 1) / 49);
+    if (spotifyRank) song_score += 0.10 * (1 - (spotifyRank  - 1) / 199);
+    song_score += Math.min(0.10, sourceCount * 0.04);
+
+    return {
+      ...s,
+      lfm_rank: lfmRank, genius_rank: geniusRank,
+      shazam_rank: shazamRank, spotify_rank: spotifyRank,
+      song_score: Math.round(song_score * 100) / 100,
+    };
+  }).sort((a, b) => b.song_score - a.song_score);
 }
 
 module.exports = { runDigest };

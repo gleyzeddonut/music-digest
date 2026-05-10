@@ -10,7 +10,8 @@ function createTransport() {
   return nodemailer.createTransport({
     host: config.SMTP_HOST,
     port: config.SMTP_PORT,
-    secure: false, // STARTTLS
+    secure: config.SMTP_PORT === 465,  // true for SSL, false + requireTLS for STARTTLS (587)
+    requireTLS: config.SMTP_PORT !== 465,
     auth: {
       user: config.SMTP_USER,
       pass: config.SMTP_PASS,
@@ -105,7 +106,7 @@ function buildHtml(date, result, playlistUrl, added, unmatched) {
     </div>` : ''}
 
     <div style="border-top:1px solid #eee;padding-top:20px;text-align:center;">
-      <a href="http://localhost:3000" style="color:#aaa;font-size:12px;text-decoration:none;">View full dashboard →</a>
+      <span style="color:#ccc;font-size:11px;">Music Digest</span>
     </div>
 
   </div>
@@ -145,9 +146,19 @@ async function sendDigestEmail(date, result, playlistUrl, added = [], unmatched 
     console.log(`[email] Digest sent to ${getDigestTo()}`);
     return true;
   } catch (err) {
-    console.error('[email] Failed to send:', err.message);
+    console.error('[email] Failed to send:', err.message, err.code || '', err.response || '');
     return false;
   }
 }
 
-module.exports = { sendDigestEmail };
+async function verifySmtp() {
+  if (!config.SMTP_USER || !config.SMTP_PASS) return;
+  try {
+    await createTransport().verify();
+    console.log(`[email] SMTP ready — ${config.SMTP_USER}`);
+  } catch (err) {
+    console.warn(`[email] SMTP check failed: ${err.message}`);
+  }
+}
+
+module.exports = { sendDigestEmail, verifySmtp };

@@ -1,5 +1,4 @@
-const Anthropic = require('@anthropic-ai/sdk');
-const config = require('../config');
+const supabase = require('../supabase-client');
 
 function buildPrompt(date, redditData, webData, tiktokData = [], playlistData = [], scoredData = null) {
   const lines = [`TODAY'S DATE: ${date}\n`];
@@ -16,8 +15,11 @@ function buildPrompt(date, redditData, webData, tiktokData = [], playlistData = 
         lines.push(e.name);
 
         const chartParts = [];
-        if (e.chartPositions.apple)  chartParts.push(`Apple Music #${e.chartPositions.apple}`);
-        if (e.chartPositions.lastfm) chartParts.push(`Last.fm Top Artists #${e.chartPositions.lastfm}`);
+        if (e.chartPositions.shazam)       chartParts.push(`Shazam Viral #${e.chartPositions.shazam}`);
+        if (e.chartPositions.apple)        chartParts.push(`Apple Music #${e.chartPositions.apple}`);
+        if (e.chartPositions.spotify)      chartParts.push(`Spotify Global #${e.chartPositions.spotify}`);
+        if (e.chartPositions.lastfm)       chartParts.push(`Last.fm Artists #${e.chartPositions.lastfm}`);
+        if (e.chartPositions.lastfm_track) chartParts.push(`Last.fm Tracks #${e.chartPositions.lastfm_track}`);
         if (chartParts.length) lines.push(`  Charts: ${chartParts.join(', ')}`);
 
         const editSources = [...new Set(e.editorialArticles.map(a => a.source))];
@@ -34,6 +36,7 @@ function buildPrompt(date, redditData, webData, tiktokData = [], playlistData = 
           velParts.push(`Last.fm ${pct >= 0 ? '+' : ''}${pct}% WoW`);
         }
         if (e.geniusTrending) velParts.push(`Genius trending #${e.geniusTrending.rank}`);
+        if (e.hypemSignal)    velParts.push(`Hype Machine (${e.hypemSignal.blogs} blogs, ${e.hypemSignal.loved} loved)`);
         if (velParts.length) lines.push(`  Velocity: ${velParts.join(', ')}`);
 
         lines.push('');
@@ -78,21 +81,14 @@ function buildPrompt(date, redditData, webData, tiktokData = [], playlistData = 
 }
 
 async function processWithClaude(date, redditData, webData, tiktokData = [], playlistData = [], scoredData = null) {
-  if (!config.CLAUDE_API_KEY) {
-    throw new Error('CLAUDE_API_KEY not set in .env');
+  // If the user stored their own API key, use the SDK directly; otherwise go through the shared proxy.
+  let ownKey = null;
+  if (process.versions.electron) {
+    try { ownKey = require('../electron/config-store').getConfig('claude_api_key'); } catch {}
   }
 
-  let apiKey = config.CLAUDE_API_KEY;
-  if (process.versions.electron) {
-    try {
-      const { getConfig } = require('../electron/config-store');
-      apiKey = getConfig('claude_api_key') ?? apiKey;
-    } catch (err) {
-      console.warn('[claude] Could not read Electron config-store:', err.message);
-    }
-  }
-  const client = new Anthropic({ apiKey });
   const rawContent = buildPrompt(date, redditData, webData, tiktokData, playlistData, scoredData);
+  console.log('[claude] Sending to API (this can take up to a minute)...');
 
   const systemPrompt = `You are a music industry analyst creating a daily briefing. Your job is to surface what is genuinely generating buzz today, stated plainly.
 
@@ -115,12 +111,12 @@ Writing style for the summary:
 - No flowery language, superlatives, or hype ("electrifying", "dominating", "explosive", etc.)
 - Cite specifics: names, numbers, release titles, platform data where available
 - 5-8 bullet points, each covering a distinct story or trend
-- Each bullet on its own line, separated by \n — never run them together in one block
+- Each bullet on its own line, separated by \\n — never run them together in one block
 - One artist or story per bullet — if two artists are mentioned, use two bullets
 
 Respond with valid JSON only, no markdown, no explanation:
 {
-  "summary": "5-8 bullets, one per line separated by \\n. Each starts with '• '. One story per bullet. Example: '• Kendrick Lamar topped Apple Charts this week.\\n• Megan Thee Stallion released a surprise EP on Friday.'",
+  "summary": "5-8 bullets, one per line separated by \\\\n. Each starts with '• '. One story per bullet. Example: '• Kendrick Lamar topped Apple Charts this week.\\\\n• Megan Thee Stallion released a surprise EP on Friday.'",
   "artists": [
     {"name": "string", "tier": "breaking|rising", "reason": "1-2 sentences: what specifically is driving attention, cite sources/numbers"}
   ],
@@ -130,12 +126,31 @@ Respond with valid JSON only, no markdown, no explanation:
   "headline_indices": [0, 4, 7]
 }`;
 
-  const response = await client.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 8000,
-    system: systemPrompt,
-    messages: [{ role: 'user', content: rawContent }],
-  });
+  let response;
+  if (ownKey) {
+    const Anthropic = require('@anthropic-ai/sdk');
+    const client = new Anthropic({ apiKey: ownKey, timeout: 120_000 });
+    response = await client.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 8000,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: rawContent }],
+    });
+  } else {
+    const res = await fetch(`${supabase.url}/functions/v1/claude-proxy`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: supabase.anonKey },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 8000,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: rawContent }],
+      }),
+      signal: AbortSignal.timeout(120_000),
+    });
+    if (!res.ok) throw new Error(`Claude proxy error ${res.status}: ${await res.text()}`);
+    response = await res.json();
+  }
 
   if (response.stop_reason === 'max_tokens') {
     console.error('[claude] Response was truncated — output hit token limit');

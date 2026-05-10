@@ -1,31 +1,59 @@
 'use strict';
 
-const axios = require('axios');
-const config = require('../config');
+const axios    = require('axios');
+const supabase = require('../supabase-client');
 
-const BASE = 'https://api.genius.com';
-
-// Genius charts/songs endpoints require elevated API access.
-// Instead, search across popular genre terms and rank by page views.
-const QUERIES = ['hip hop', 'pop', 'rap', 'r&b', 'indie', 'electronic'];
+const CHART_URL = 'https://genius.com/api/songs/chart';
+const HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  'Referer':    'https://genius.com/',
+  'Accept':     'application/json',
+};
 
 async function scrapeGenius() {
-  const key = config.GENIUS_API_KEY;
-  if (!key) {
-    console.warn('[genius] GENIUS_API_KEY not set — skipping');
-    return [];
-  }
+  try {
+    const { data } = await axios.get(CHART_URL, {
+      timeout: 12000,
+      params:  { time_period: 'day', per_page: 50 },
+      headers: HEADERS,
+    });
 
-  const seen = new Set();
+    const items = data?.response?.chart_items;
+    if (!Array.isArray(items) || items.length === 0) throw new Error('empty chart_items');
+
+    const ranked = items
+      .filter(ci => ci.type === 'song' && ci.item)
+      .map((ci, i) => ({
+        title:     ci.item.title_with_featured || ci.item.full_title?.split(' by ')[0] || ci.item.title,
+        artist:    ci.item.primary_artist_names || ci.item.artist_names || '',
+        rank:      i + 1,
+        pageViews: ci.item.stats?.pageviews || 0,
+      }));
+
+    console.log(`[genius] ${ranked.length} songs from daily chart`);
+    return ranked;
+  } catch (err) {
+    console.warn(`[genius] Chart failed (${err.message}) — falling back to search`);
+    return fallbackSearch();
+  }
+}
+
+const QUERIES = ['hip hop', 'pop', 'rap', 'r&b', 'indie', 'electronic'];
+
+async function fallbackSearch() {
+  const seen  = new Set();
   const songs = [];
 
   for (const q of QUERIES) {
     try {
-      const { data } = await axios.get(`${BASE}/search`, {
-        timeout: 10000,
-        params: { q, per_page: 20 },
-        headers: { Authorization: `Bearer ${key}` },
+      const res = await fetch(`${supabase.url}/functions/v1/genius-proxy`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', apikey: supabase.anonKey },
+        body: JSON.stringify({ path: '/search', params: { q, per_page: 20 } }),
+        signal: AbortSignal.timeout(10000),
       });
+      if (!res.ok) continue;
+      const data = await res.json();
       for (const hit of (data?.response?.hits || [])) {
         const s = hit.result;
         if (!s || seen.has(s.id)) continue;
@@ -36,9 +64,7 @@ async function scrapeGenius() {
           pageViews: s.stats?.pageviews || 0,
         });
       }
-    } catch (err) {
-      console.warn(`[genius] Search "${q}" failed: ${err.message}`);
-    }
+    } catch {}
   }
 
   const ranked = songs
@@ -46,7 +72,7 @@ async function scrapeGenius() {
     .slice(0, 50)
     .map((s, i) => ({ ...s, rank: i + 1 }));
 
-  console.log(`[genius] ${ranked.length} songs via search`);
+  console.log(`[genius] ${ranked.length} songs via search fallback`);
   return ranked;
 }
 

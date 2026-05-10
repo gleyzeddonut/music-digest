@@ -1,8 +1,8 @@
-const axios = require('axios');
-const config = require('../config');
+const axios    = require('axios');
+const supabase = require('../supabase-client');
+const config   = require('../config');
 const { getDb } = require('../db/init');
 
-const ACCOUNTS_BASE = 'https://accounts.spotify.com';
 const API_BASE = 'https://api.spotify.com/v1';
 const PLAYLIST_NAME = '🎵 Music Digest';
 const PLAYLIST_DESC = 'Daily music discoveries. Auto-updated by Music Digest.';
@@ -17,43 +17,38 @@ function setSetting(key, value) {
   getDb().prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(key, value);
 }
 
-// ── OAuth URLs ────────────────────────────────────────────────
+// ── OAuth (proxied through Supabase) ──────────────────────────
 
-function getAuthUrl() {
-  const scopes = 'playlist-modify-public playlist-modify-private playlist-read-private';
-  const params = new URLSearchParams({
-    client_id: config.SPOTIFY_CLIENT_ID,
-    response_type: 'code',
-    redirect_uri: config.SPOTIFY_REDIRECT_URI,
-    scope: scopes,
-    state: 'music-digest',
+async function spotifyAuth(body) {
+  const res = await fetch(`${supabase.url}/functions/v1/spotify-proxy`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', apikey: supabase.anonKey },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(15000),
   });
-  return `${ACCOUNTS_BASE}/authorize?${params}`;
+  if (!res.ok) throw new Error(`Spotify auth proxy error ${res.status}`);
+  return res.json();
+}
+
+async function getAuthUrl() {
+  const { url } = await spotifyAuth({
+    action: 'auth-url',
+    redirect_uri: config.SPOTIFY_REDIRECT_URI,
+  });
+  return url;
 }
 
 async function handleCallback(code) {
-  const credentials = Buffer.from(
-    `${config.SPOTIFY_CLIENT_ID}:${config.SPOTIFY_CLIENT_SECRET}`
-  ).toString('base64');
-
-  const { data } = await axios.post(
-    `${ACCOUNTS_BASE}/api/token`,
-    new URLSearchParams({
-      grant_type: 'authorization_code',
-      code,
-      redirect_uri: config.SPOTIFY_REDIRECT_URI,
-    }),
-    {
-      headers: {
-        Authorization: `Basic ${credentials}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-    }
-  );
+  const data = await spotifyAuth({
+    action: 'exchange',
+    code,
+    redirect_uri: config.SPOTIFY_REDIRECT_URI,
+  });
 
   setSetting('spotify_access_token', data.access_token);
   setSetting('spotify_refresh_token', data.refresh_token);
   setSetting('spotify_token_expires_at', String(Date.now() + data.expires_in * 1000));
+  getDb().prepare("DELETE FROM settings WHERE key = 'spotify_playlist_id'").run();
   console.log('[spotify] OAuth complete, tokens saved');
 }
 
@@ -67,28 +62,14 @@ async function getAccessToken() {
   if (!accessToken || !refreshToken) return null;
 
   if (Date.now() > expiresAt - 60000) {
-    // Refresh
-    const credentials = Buffer.from(
-      `${config.SPOTIFY_CLIENT_ID}:${config.SPOTIFY_CLIENT_SECRET}`
-    ).toString('base64');
-
     try {
-      const { data } = await axios.post(
-        `${ACCOUNTS_BASE}/api/token`,
-        new URLSearchParams({ grant_type: 'refresh_token', refresh_token: refreshToken }),
-        {
-          headers: {
-            Authorization: `Basic ${credentials}`,
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-        }
-      );
+      const data = await spotifyAuth({ action: 'refresh', refresh_token: refreshToken });
       setSetting('spotify_access_token', data.access_token);
       setSetting('spotify_token_expires_at', String(Date.now() + data.expires_in * 1000));
       console.log('[spotify] Token refreshed');
       return data.access_token;
     } catch (err) {
-      console.error('[spotify] Token refresh failed:', err.response?.data || err.message);
+      console.error('[spotify] Token refresh failed:', err.message);
       return null;
     }
   }
@@ -107,17 +88,20 @@ function spotifyApi(token) {
 
 async function getOrCreatePlaylist(api) {
   const existingId = getSetting('spotify_playlist_id');
+  const { data: me } = await api.get('/me');
 
   if (existingId) {
     try {
-      await api.get(`/playlists/${existingId}`);
-      return existingId;
+      const { data: pl } = await api.get(`/playlists/${existingId}`);
+      // Only reuse if the connected user owns it
+      if (pl.owner?.id === me.id) return existingId;
+      console.log('[spotify] Stored playlist belongs to a different account — creating new one');
     } catch {
-      // Playlist deleted — fall through to create
+      // Playlist deleted or inaccessible — fall through to create
     }
+    getDb().prepare("DELETE FROM settings WHERE key = 'spotify_playlist_id'").run();
   }
 
-  const { data: me } = await api.get('/me');
   const { data: playlist } = await api.post(`/users/${me.id}/playlists`, {
     name: PLAYLIST_NAME,
     description: PLAYLIST_DESC,
@@ -156,6 +140,12 @@ async function appendSongsToPlaylist(songs, date) {
     return { added: [], unmatched: [] };
   }
 
+  // Only add songs with corroborating signal: on any chart OR mentioned in 2+ sources
+  const eligible = songs.filter(s => s.lfm_rank || s.genius_rank || s.shazam_rank || s.spotify_rank || (s.sources?.length || 0) >= 2);
+  const skipped  = songs.length - eligible.length;
+  if (skipped > 0) console.log(`[spotify] Skipping ${skipped} low-signal song(s)`);
+  songs = eligible;
+
   const api = spotifyApi(token);
   const playlistId = await getOrCreatePlaylist(api);
   const db = getDb();
@@ -185,7 +175,7 @@ async function appendSongsToPlaylist(songs, date) {
 
     urisToAdd.push(track.uri);
     insertTrack.run(track.id, track.name, track.artists[0]?.name, date);
-    added.push({ title: track.name, artist: track.artists[0]?.name, id: track.id });
+    added.push({ title: track.name, artist: track.artists[0]?.name, id: track.id, preview_url: track.preview_url || null });
     console.log(`[spotify] Queued: "${track.name}" by ${track.artists[0]?.name}`);
   }
 

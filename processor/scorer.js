@@ -31,13 +31,22 @@ for (const [tier, names] of Object.entries(EDITORIAL_TIERS)) {
 }
 
 // ── Name normalization ───────────────────────────────────────────────────────
-// Strips featured artists and normalizes for map keying.
 function normalizeArtist(name) {
   if (!name) return '';
   return name
     .toLowerCase()
     .replace(/\s+(feat\.?|ft\.?|featuring|with|×)\s+.*/i, '')
     .replace(/[^\w\s]/g, '')
+    .trim();
+}
+
+function normalizeTrack(title) {
+  if (!title) return '';
+  return title
+    .toLowerCase()
+    .replace(/\s*[\(\[](?:feat\.?|ft\.?|featuring|prod\.?|with|remix|edit|version|remaster)[^\)\]]*[\)\]]/gi, '')
+    .replace(/[^\w\s]/g, '')
+    .replace(/\s+/g, ' ')
     .trim();
 }
 
@@ -50,7 +59,7 @@ function extractArtistFromTitle(title) {
 }
 
 // ── Build unified mention map ────────────────────────────────────────────────
-function buildMentionMap(redditData, webData, appleCharts, lastfmArtists, geniusTrending, lastfmBaselines) {
+function buildMentionMap(redditData, webData, appleCharts, lastfmArtists, geniusTrending, lastfmBaselines, lastfmTracks, shazamChart, spotifyChart, hypemData) {
   const map = new Map(); // normalizedName → entity object
 
   function getOrCreate(rawName) {
@@ -65,6 +74,7 @@ function buildMentionMap(redditData, webData, appleCharts, lastfmArtists, genius
         chartPositions:    {},
         geniusTrending:    null,
         lastfmListeners:   null,
+        hypemSignal:       null,
       });
     }
     return map.get(key);
@@ -85,9 +95,42 @@ function buildMentionMap(redditData, webData, appleCharts, lastfmArtists, genius
     }
   }
 
+  // Last.fm top tracks — add track chart position to the artist's entity
+  for (const { title, artist, rank } of (lastfmTracks || [])) {
+    const e = getOrCreate(artist);
+    if (e) {
+      const prev = e.chartPositions.lastfm_track;
+      if (prev == null || rank < prev) e.chartPositions.lastfm_track = rank;
+    }
+  }
+
   for (const { artist, rank, pageViews } of geniusTrending) {
     const e = getOrCreate(artist);
     if (e) e.geniusTrending = { rank, pageViews };
+  }
+
+  // Shazam Viral Chart — strongest leading indicator (growth rate, not volume)
+  for (const { artist, rank } of (shazamChart || [])) {
+    const e = getOrCreate(artist);
+    if (e) {
+      const prev = e.chartPositions.shazam;
+      if (prev == null || rank < prev) e.chartPositions.shazam = rank;
+    }
+  }
+
+  // Spotify Global daily — broad mainstream signal
+  for (const { artist, rank } of (spotifyChart || [])) {
+    const e = getOrCreate(artist);
+    if (e) {
+      const prev = e.chartPositions.spotify;
+      if (prev == null || rank < prev) e.chartPositions.spotify = rank;
+    }
+  }
+
+  // Hype Machine — indie blog editorial signal (pre-chart discovery)
+  for (const { artist, blogs, loved } of (hypemData || [])) {
+    const e = getOrCreate(artist);
+    if (e) e.hypemSignal = { blogs, loved };
   }
 
   // Match editorial articles against all known artists by title scan
@@ -137,12 +180,23 @@ function buildMentionMap(redditData, webData, appleCharts, lastfmArtists, genius
 
 function calcChartScore(entity) {
   let score = 0;
+  // Shazam Viral: highest weight — measures growth rate, not volume
+  if (entity.chartPositions.shazam != null) {
+    score += 0.40 * (1 - (entity.chartPositions.shazam - 1) / 49);
+  }
   if (entity.chartPositions.apple != null) {
-    score += 1 - (entity.chartPositions.apple - 1) / 99;
+    score += 0.25 * (1 - (entity.chartPositions.apple - 1) / 99);
   }
   if (entity.chartPositions.lastfm != null) {
     const rank = entity.chartPositions.lastfm;
-    score += 0.3 + 0.4 * (1 - (rank - 1) / 49);
+    score += 0.15 + 0.20 * (1 - (rank - 1) / 49);
+  }
+  if (entity.chartPositions.lastfm_track != null) {
+    const rank = entity.chartPositions.lastfm_track;
+    score += 0.10 + 0.15 * (1 - (rank - 1) / 49);
+  }
+  if (entity.chartPositions.spotify != null) {
+    score += 0.10 * (1 - (entity.chartPositions.spotify - 1) / 199);
   }
   return Math.min(1, score);
 }
@@ -182,6 +236,13 @@ function calcVelocityScore(entity) {
     signals.push(1 - (entity.geniusTrending.rank - 1) / 49);
   }
 
+  // Hype Machine blog coverage — pre-chart editorial signal
+  if (entity.hypemSignal) {
+    const blogScore = Math.min(1, (entity.hypemSignal.blogs - 1) / 9);
+    const lovedScore = Math.min(1, entity.hypemSignal.loved / 50);
+    signals.push(Math.max(blogScore, lovedScore));
+  }
+
   const now = Date.now();
   const oneDay = 86_400_000;
   let bestRecency = 0;
@@ -219,13 +280,14 @@ function updateBaselines(lastfmArtists) {
 }
 
 // ── Main entry point ─────────────────────────────────────────────────────────
-function score(redditData, webData, appleCharts, lastfmArtists, geniusTrending) {
+function score(redditData, webData, appleCharts, lastfmArtists, geniusTrending, lastfmTracks = [], shazamChart = [], spotifyChart = [], hypemData = []) {
   const db = getDb();
   const rows = db.prepare('SELECT artist_name, listeners FROM artist_baselines').all();
   const lastfmBaselines = Object.fromEntries(rows.map(r => [r.artist_name, r.listeners]));
 
   const mentionMap = buildMentionMap(
-    redditData, webData, appleCharts, lastfmArtists, geniusTrending, lastfmBaselines
+    redditData, webData, appleCharts, lastfmArtists, geniusTrending, lastfmBaselines, lastfmTracks,
+    shazamChart, spotifyChart, hypemData
   );
 
   // Raw community scores — needed for normalization across all artists
@@ -262,4 +324,4 @@ function score(redditData, webData, appleCharts, lastfmArtists, geniusTrending) 
   return { breaking, rising };
 }
 
-module.exports = { score, normalizeArtist };
+module.exports = { score, normalizeArtist, normalizeTrack };

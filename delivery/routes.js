@@ -3,6 +3,7 @@ const path = require('path');
 const { getDb } = require('../db/init');
 const { runDigest } = require('../processor/digest');
 const { getAuthUrl, handleCallback, isConnected, getPlaylistUrl } = require('../processor/spotify');
+const { sendDigestEmail } = require('./email');
 
 // config-store is only available and callable in Electron context
 const configStore = process.versions.electron
@@ -13,11 +14,13 @@ const router = express.Router();
 
 // Persists user-supplied setup values to all three stores so the current
 // session, DB scheduler, and next app launch all see the new values.
-function persistSetupConfig(digestTo, claudeApiKey) {
+function persistSetupConfig(digestTo, claudeApiKey, userName) {
   configStore.setConfig('digest_to', digestTo);
   if (claudeApiKey) configStore.setConfig('claude_api_key', claudeApiKey);
 
-  getDb().prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('digest_to', digestTo);
+  const set = (k, v) => getDb().prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(k, v);
+  set('digest_to', digestTo);
+  if (userName) set('user_name', userName);
 
   process.env.DIGEST_TO = digestTo;
   if (claudeApiKey) process.env.CLAUDE_API_KEY = claudeApiKey;
@@ -51,12 +54,12 @@ router.get('/', (req, res, next) => {
 
 router.post('/api/setup', (req, res) => {
   if (!process.versions.electron) return res.status(404).json({ error: 'Not available outside Electron' });
-  const { digestTo, claudeApiKey } = req.body;
+  const { digestTo, claudeApiKey, userName } = req.body;
   if (!digestTo || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(digestTo)) {
     return res.status(400).json({ error: 'Valid email address required' });
   }
 
-  persistSetupConfig(digestTo.trim(), claudeApiKey?.trim() || null);
+  persistSetupConfig(digestTo.trim(), claudeApiKey?.trim() || null, userName?.trim() || null);
   res.json({ ok: true });
 });
 
@@ -101,8 +104,12 @@ router.post('/api/settings/config', (req, res) => {
 
 // ── Spotify OAuth ─────────────────────────────────────────────
 
-router.get('/auth/spotify', (req, res) => {
-  res.redirect(getAuthUrl());
+router.get('/auth/spotify', async (req, res) => {
+  try {
+    res.redirect(await getAuthUrl());
+  } catch (err) {
+    res.send(`<script>window.location='/?spotify_error=${encodeURIComponent(err.message)}'</script>`);
+  }
 });
 
 router.get('/auth/spotify/callback', async (req, res) => {
@@ -123,6 +130,36 @@ router.get('/api/digest/latest', (req, res) => {
   const digest = db.prepare('SELECT * FROM digests ORDER BY date DESC LIMIT 1').get();
   if (!digest) return res.json(null);
   res.json(parseDigest(digest));
+});
+
+router.get('/api/digests/:date', (req, res) => {
+  const digest = getDb().prepare('SELECT * FROM digests WHERE date = ?').get(req.params.date);
+  if (!digest) return res.status(404).json({ error: 'Not found' });
+  res.json(parseDigest(digest));
+});
+
+router.post('/api/digests/:date/resend', async (req, res) => {
+  const config = require('../config');
+  if (!config.SMTP_USER || !config.SMTP_PASS) {
+    return res.status(400).json({ error: 'Email not configured — add SMTP credentials in settings' });
+  }
+  const db = getDb();
+  const row = db.prepare('SELECT * FROM digests WHERE date = ?').get(req.params.date);
+  if (!row) return res.status(404).json({ error: 'Digest not found' });
+
+  const result = parseDigest(row);
+  const added = db.prepare(
+    'SELECT track_name AS title, artist_name AS artist, track_id AS id FROM playlist_tracks WHERE digest_date = ?'
+  ).all(req.params.date);
+  const addedTitles = new Set(added.map(a => (a.title || '').toLowerCase()));
+  const unmatched = result.songs.filter(s => !addedTitles.has((s.title || '').toLowerCase()));
+
+  try {
+    const sent = await sendDigestEmail(req.params.date, result, row.playlist_url, added, unmatched);
+    res.json({ ok: sent, error: sent ? null : 'Send failed — check SMTP settings' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 router.get('/api/digests', (req, res) => {
@@ -212,11 +249,13 @@ router.get('/api/settings', (req, res) => {
   const config = require('../config');
   const db_get = (key, fallback) => { const v = dbSettings[key]; return v != null ? v : fallback; };
   res.json({
-    email:      db_get('digest_to',            config.DIGEST_TO),
-    sendTime:   db_get('schedule_send_time',   config.SEND_TIME),
-    frequency:  db_get('schedule_frequency',   'daily'),
-    weekDay:    parseInt(db_get('schedule_week_day',   '5'),  10),
-    monthDate:  parseInt(db_get('schedule_month_date', '1'),  10),
+    email:           db_get('digest_to',            config.DIGEST_TO),
+    sendTime:        db_get('schedule_send_time',   config.SEND_TIME),
+    frequency:       db_get('schedule_frequency',   'daily'),
+    weekDay:         parseInt(db_get('schedule_week_day',   '5'),  10),
+    monthDate:       parseInt(db_get('schedule_month_date', '1'),  10),
+    scheduleEnabled: db_get('schedule_enabled', '1') !== '0',
+    userName:        db_get('user_name', ''),
     timezone: config.TIMEZONE,
     spotify: {
       connected: isConnected(),
@@ -228,7 +267,7 @@ router.get('/api/settings', (req, res) => {
 // ── Schedule settings ─────────────────────────────────────────
 
 router.post('/api/settings/schedule', (req, res) => {
-  const { sendTime, frequency, weekDay, monthDate, digestTo } = req.body;
+  const { sendTime, frequency, weekDay, monthDate, digestTo, enabled, userName } = req.body;
   if (!sendTime || !/^\d{1,2}:\d{2}$/.test(sendTime)) {
     return res.status(400).json({ error: 'sendTime must be HH:MM format' });
   }
@@ -238,9 +277,11 @@ router.post('/api/settings/schedule', (req, res) => {
   const db = getDb();
   const set = (k, v) => db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(k, v);
   set('schedule_send_time', sendTime);
+  if (enabled !== undefined) set('schedule_enabled', enabled ? '1' : '0');
   if (frequency) set('schedule_frequency', frequency);
   if (weekDay !== undefined) set('schedule_week_day', String(weekDay));
   if (monthDate !== undefined) set('schedule_month_date', String(monthDate));
+  if (userName !== undefined) set('user_name', userName.trim());
   if (digestTo) {
     set('digest_to', digestTo.trim());
     // Keep config-store and process.env in sync so Electron reads the correct
@@ -304,6 +345,7 @@ router.get('/api/status', (req, res) => {
     timezone: config.TIMEZONE,
     sourcesCount: db.prepare('SELECT COUNT(*) as n FROM sources WHERE enabled = 1').get().n,
     tracksInPlaylist: db.prepare('SELECT COUNT(*) as n FROM playlist_tracks').get().n,
+    userName: db.prepare("SELECT value FROM settings WHERE key = 'user_name'").get()?.value || '',
   });
 });
 

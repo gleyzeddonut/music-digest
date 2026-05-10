@@ -3,44 +3,59 @@ const CORS = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Spotify token endpoint — exchanges client credentials for an access token
-async function getSpotifyToken(): Promise<string> {
-  const creds = btoa(
-    `${Deno.env.get('SPOTIFY_CLIENT_ID')}:${Deno.env.get('SPOTIFY_CLIENT_SECRET')}`
-  )
-  const res = await fetch('https://accounts.spotify.com/api/token', {
-    method: 'POST',
-    headers: {
-      Authorization: `Basic ${creds}`,
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: 'grant_type=client_credentials',
-  })
-  const { access_token } = await res.json()
-  return access_token
+const TOKEN_URL = 'https://accounts.spotify.com/api/token'
+const AUTH_URL  = 'https://accounts.spotify.com/authorize'
+const SCOPES    = 'playlist-modify-public playlist-modify-private playlist-read-private'
+
+function creds() {
+  return btoa(`${Deno.env.get('SPOTIFY_CLIENT_ID')}:${Deno.env.get('SPOTIFY_CLIENT_SECRET')}`)
 }
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
 
   try {
-    const { path, params } = await req.json()  // e.g. { path: '/v1/playlists/37i9dQ...', params: {} }
-    const token = await getSpotifyToken()
-    const url = new URL(`https://api.spotify.com${path}`)
-    if (params) Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, String(v)))
+    const { action, code, refresh_token, redirect_uri } = await req.json()
 
-    const res = await fetch(url.toString(), {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-    const data = await res.json()
-    return new Response(JSON.stringify(data), {
-      status: res.status,
-      headers: { ...CORS, 'Content-Type': 'application/json' },
+    if (action === 'auth-url') {
+      const params = new URLSearchParams({
+        client_id:     Deno.env.get('SPOTIFY_CLIENT_ID') ?? '',
+        response_type: 'code',
+        redirect_uri:  redirect_uri ?? '',
+        scope:         SCOPES,
+        state:         'music-digest',
+      })
+      return new Response(JSON.stringify({ url: `${AUTH_URL}?${params}` }), {
+        headers: { ...CORS, 'Content-Type': 'application/json' },
+      })
+    }
+
+    if (action === 'exchange') {
+      const res = await fetch(TOKEN_URL, {
+        method:  'POST',
+        headers: { Authorization: `Basic ${creds()}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+        body:    new URLSearchParams({ grant_type: 'authorization_code', code, redirect_uri }),
+      })
+      const text = await res.text()
+      return new Response(text, { status: res.status, headers: { ...CORS, 'Content-Type': 'application/json' } })
+    }
+
+    if (action === 'refresh') {
+      const res = await fetch(TOKEN_URL, {
+        method:  'POST',
+        headers: { Authorization: `Basic ${creds()}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+        body:    new URLSearchParams({ grant_type: 'refresh_token', refresh_token }),
+      })
+      const text = await res.text()
+      return new Response(text, { status: res.status, headers: { ...CORS, 'Content-Type': 'application/json' } })
+    }
+
+    return new Response(JSON.stringify({ error: 'Unknown action' }), {
+      status: 400, headers: { ...CORS, 'Content-Type': 'application/json' },
     })
   } catch (err) {
     return new Response(JSON.stringify({ error: String(err) }), {
-      status: 500,
-      headers: { ...CORS, 'Content-Type': 'application/json' },
+      status: 500, headers: { ...CORS, 'Content-Type': 'application/json' },
     })
   }
 })

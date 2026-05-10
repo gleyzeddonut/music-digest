@@ -5,6 +5,7 @@ const path = require('path');
 const { initDb, getDb } = require('./db/init');
 const routes = require('./delivery/routes');
 const { runDigest } = require('./processor/digest');
+const { verifySmtp } = require('./delivery/email');
 const config = require('./config');
 
 const app = express();
@@ -51,6 +52,7 @@ function startServer() {
       const todayKey = now.toISOString().split('T')[0];
 
       if (now.getHours() === hour && now.getMinutes() === minute && lastScheduledRun !== todayKey) {
+        if (getSetting('schedule_enabled', '1') === '0') return;
         if (!shouldSendToday(now)) return;
         lastScheduledRun = todayKey;
         console.log(`\n[${now.toISOString()}] ── Scheduled digest run starting ──`);
@@ -77,6 +79,7 @@ function startServer() {
 ║  Schedule   →  ${sendTime} ${config.TIMEZONE.padEnd(20)}║
 ╚══════════════════════════════════════════╝
 `);
+      verifySmtp();
       resolve();
     }).on('error', reject);
   });
