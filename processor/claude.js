@@ -16,6 +16,7 @@ function buildPrompt(date, redditData, webData, tiktokData = [], playlistData = 
 
         const chartParts = [];
         if (e.chartPositions.shazam)       chartParts.push(`Shazam Viral #${e.chartPositions.shazam}`);
+        if (e.chartPositions.tiktok)       chartParts.push(`TikTok US #${e.chartPositions.tiktok}`);
         if (e.chartPositions.apple)        chartParts.push(`Apple Music #${e.chartPositions.apple}`);
         if (e.chartPositions.spotify)      chartParts.push(`Spotify Global #${e.chartPositions.spotify}`);
         if (e.chartPositions.lastfm)       chartParts.push(`Last.fm Artists #${e.chartPositions.lastfm}`);

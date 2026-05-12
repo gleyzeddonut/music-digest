@@ -64,15 +64,14 @@ async function scrapeHtml(source) {
 }
 
 async function scrapeWeb(sources) {
-  const results = [];
-  for (const source of sources) {
-    await new Promise(r => setTimeout(r, 500));
-    const result = source.type === 'rss'
-      ? await scrapeRss(source)
-      : await scrapeHtml(source);
-    if (result.items.length > 0) results.push(result);
-  }
-  return results;
+  // Staggered parallel — all fetches start together but offset by 300ms each
+  // to be a good citizen while cutting total wall time from ~30s to ~5s.
+  const tasks = sources.map((source, i) =>
+    new Promise(r => setTimeout(r, i * 300))
+      .then(() => source.type === 'rss' ? scrapeRss(source) : scrapeHtml(source))
+  );
+  const results = await Promise.all(tasks);
+  return results.filter(r => r.items.length > 0);
 }
 
 module.exports = { scrapeWeb };

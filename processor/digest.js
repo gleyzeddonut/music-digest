@@ -43,7 +43,7 @@ async function runDigest(opts = {}) {
   console.log(`[digest] ${redditSources.length} subreddits · ${webSources.length} web sources · ${tiktokSources.length} TikTok · ${playlistSources.length} Spotify playlists`);
 
   // 2. Scrape in parallel
-  const [redditData, webData, tiktokData, playlistData, appleCharts, lastfmData, geniusTrending, shazamChart, spotifyChart, hypemData] = await Promise.all([
+  const [redditData, webData, tiktokResult, playlistData, appleCharts, lastfmData, geniusTrending, shazamChart, spotifyChart, hypemData] = await Promise.all([
     scrapeReddit(redditSources),
     scrapeWeb(webSources),
     scrapeTikTok(tiktokSources),
@@ -55,6 +55,10 @@ async function runDigest(opts = {}) {
     scrapeKworbSpotify(),
     scrapeHypem(),
   ]);
+
+  // tiktokResult splits into formatted (for Claude prompt) and raw (for scorer)
+  const tiktokData    = tiktokResult.formatted;
+  const tiktokRaw     = tiktokResult.raw;
 
   console.log(`[digest] Shazam: ${shazamChart.length} · Spotify global: ${spotifyChart.length} · Hype Machine: ${hypemData.length} · TikTok: ${tiktokData.reduce((n,t)=>n+t.items.length,0)}`);
 
@@ -69,7 +73,7 @@ async function runDigest(opts = {}) {
   }
 
   console.log('[PHASE] Scoring');
-  const scoredData = score(redditData, webData, appleCharts, lastfmData.artists, geniusTrending, lastfmData.tracks, shazamChart, spotifyChart, hypemData);
+  const scoredData = score(redditData, webData, appleCharts, lastfmData.artists, geniusTrending, lastfmData.tracks, shazamChart, spotifyChart, hypemData, tiktokRaw);
 
   console.log('[PHASE] Claude');
   console.log(`[digest] Scraped ${totalItems} total items. Sending to Claude...`);
@@ -96,7 +100,7 @@ async function runDigest(opts = {}) {
   console.log(`[digest] Headlines resolved: ${matched}/${result.headlines.length} with URLs`);
 
   // Score songs against chart data and sort by signal strength
-  result.songs = scoreSongs(result.songs || [], lastfmData.tracks, geniusTrending, shazamChart, spotifyChart);
+  result.songs = scoreSongs(result.songs || [], lastfmData.tracks, geniusTrending, shazamChart, spotifyChart, appleCharts);
   console.log(`[digest] Song scores: ${result.songs.map(s => `${s.title}(${s.song_score.toFixed(2)})`).join(', ')}`);
 
   // Merge scorer sub-scores into Claude's artist output for UI badge rendering
@@ -176,11 +180,12 @@ function buildChartMap(tracks) {
   return map;
 }
 
-function scoreSongs(songs, lastfmTracks = [], geniusTrending = [], shazamChart = [], spotifyChart = []) {
+function scoreSongs(songs, lastfmTracks = [], geniusTrending = [], shazamChart = [], spotifyChart = [], appleCharts = []) {
   const lfmMap     = buildChartMap(lastfmTracks);
   const geniusMap  = buildChartMap(geniusTrending);
   const shazamMap  = buildChartMap(shazamChart);
   const spotifyMap = buildChartMap(spotifyChart);
+  const appleMap   = buildChartMap(appleCharts);
 
   return songs.map(s => {
     const titleNorm  = normalizeTrack(s.title);
@@ -191,20 +196,22 @@ function scoreSongs(songs, lastfmTracks = [], geniusTrending = [], shazamChart =
     const geniusRank  = geniusMap.get(fullKey)  ?? geniusMap.get(titleNorm)  ?? null;
     const shazamRank  = shazamMap.get(fullKey)  ?? shazamMap.get(titleNorm)  ?? null;
     const spotifyRank = spotifyMap.get(fullKey) ?? spotifyMap.get(titleNorm) ?? null;
+    const appleRank   = appleMap.get(fullKey)   ?? appleMap.get(titleNorm)   ?? null;
     const sourceCount = s.sources?.length || 0;
 
-    // Shazam weighted highest (leading indicator), others equal
+    // Shazam weighted highest (leading indicator); Apple added as mainstream confirmation
     let song_score = 0;
-    if (shazamRank)  song_score += 0.35 * (1 - (shazamRank  - 1) / 49);
-    if (geniusRank)  song_score += 0.25 * (1 - (geniusRank  - 1) / 49);
-    if (lfmRank)     song_score += 0.20 * (1 - (lfmRank      - 1) / 49);
+    if (shazamRank)  song_score += 0.30 * (1 - (shazamRank  - 1) / 49);
+    if (geniusRank)  song_score += 0.22 * (1 - (geniusRank  - 1) / 49);
+    if (lfmRank)     song_score += 0.18 * (1 - (lfmRank      - 1) / 49);
+    if (appleRank)   song_score += 0.15 * (1 - (appleRank    - 1) / 99);
     if (spotifyRank) song_score += 0.10 * (1 - (spotifyRank  - 1) / 199);
-    song_score += Math.min(0.10, sourceCount * 0.04);
+    song_score += Math.min(0.05, sourceCount * 0.02);
 
     return {
       ...s,
       lfm_rank: lfmRank, genius_rank: geniusRank,
-      shazam_rank: shazamRank, spotify_rank: spotifyRank,
+      shazam_rank: shazamRank, spotify_rank: spotifyRank, apple_rank: appleRank,
       song_score: Math.round(song_score * 100) / 100,
     };
   }).sort((a, b) => b.song_score - a.song_score);

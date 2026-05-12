@@ -1,6 +1,13 @@
 const axios = require('axios');
 
 const EMBED_BASE = 'https://open.spotify.com/embed/playlist/';
+
+// Handles both URI format (spotify:playlist:ID) and full URL format
+// (https://open.spotify.com/playlist/ID)
+function extractPlaylistId(urlOrUri) {
+  const match = urlOrUri.match(/(?:playlist[:/])([A-Za-z0-9]{22})/);
+  return match ? match[1] : urlOrUri.trim();
+}
 const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
 async function fetchViaEmbed(playlistId) {
@@ -23,7 +30,7 @@ async function scrapeSpotifyPlaylists(sources) {
   const results = [];
 
   for (const source of sources) {
-    const playlistId = source.url.replace('spotify:playlist:', '').trim();
+    const playlistId = extractPlaylistId(source.url);
     try {
       const { name, tracks } = await fetchViaEmbed(playlistId);
       const displayName = source.name === 'My Spotify Playlist' ? name : source.name;

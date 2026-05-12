@@ -44,27 +44,36 @@ async function fallbackSearch() {
   const seen  = new Set();
   const songs = [];
 
-  for (const q of QUERIES) {
-    try {
-      const res = await fetch(`${supabase.url}/functions/v1/genius-proxy`, {
+  // Parallel queries — previously sequential, worst case ~60s; now completes in ~10s
+  const results = await Promise.allSettled(
+    QUERIES.map(q =>
+      fetch(`${supabase.url}/functions/v1/genius-proxy`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', apikey: supabase.anonKey },
         body: JSON.stringify({ path: '/search', params: { q, per_page: 20 } }),
         signal: AbortSignal.timeout(10000),
+      }).then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+    )
+  );
+
+  for (const [i, result] of results.entries()) {
+    if (result.status === 'rejected') {
+      console.warn(`[genius] fallback query "${QUERIES[i]}" failed: ${result.reason?.message}`);
+      continue;
+    }
+    for (const hit of (result.value?.response?.hits || [])) {
+      const s = hit.result;
+      if (!s || seen.has(s.id)) continue;
+      seen.add(s.id);
+      songs.push({
+        title:     s.title_with_featured || s.title,
+        artist:    s.primary_artist?.name || '',
+        pageViews: s.stats?.pageviews || 0,
       });
-      if (!res.ok) continue;
-      const data = await res.json();
-      for (const hit of (data?.response?.hits || [])) {
-        const s = hit.result;
-        if (!s || seen.has(s.id)) continue;
-        seen.add(s.id);
-        songs.push({
-          title:     s.title_with_featured || s.title,
-          artist:    s.primary_artist?.name || '',
-          pageViews: s.stats?.pageviews || 0,
-        });
-      }
-    } catch {}
+    }
   }
 
   const ranked = songs

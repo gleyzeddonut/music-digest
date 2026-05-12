@@ -12,9 +12,14 @@ const WEIGHTS = {
 
 const THRESHOLDS = {
   breaking_chart: 0.40,
-  breaking_total: 0.55,
-  rising_total:   0.35,
+  breaking_total: 0.45,  // lowered: allows chart-dominant acts with limited press
+  rising_total:   0.28,  // lowered: catches chart-only emerging acts
 };
+
+// Fixed ceiling for community normalization — prevents viral outliers from
+// collapsing all other artists' relative community scores.
+// ~3 cross-subreddit posts each with ~3k upvotes + 500 comments ≈ 200
+const COMMUNITY_CEILING = 200;
 
 const EDITORIAL_TIERS = {
   1: ['Rolling Stone Music', 'Pitchfork', 'Billboard', 'The Guardian Music', 'Variety Music'],
@@ -36,7 +41,9 @@ function normalizeArtist(name) {
   return name
     .toLowerCase()
     .replace(/\s+(feat\.?|ft\.?|featuring|with|×)\s+.*/i, '')
-    .replace(/[^\w\s]/g, '')
+    .replace(/\$/g, 's')       // A$AP → asap, $uicideboy$ → suicideboys
+    .replace(/[^\w\s]/g, ' ')  // collapse remaining special chars to space (not nothing)
+    .replace(/\s+/g, ' ')
     .trim();
 }
 
@@ -59,7 +66,7 @@ function extractArtistFromTitle(title) {
 }
 
 // ── Build unified mention map ────────────────────────────────────────────────
-function buildMentionMap(redditData, webData, appleCharts, lastfmArtists, geniusTrending, lastfmBaselines, lastfmTracks, shazamChart, spotifyChart, hypemData) {
+function buildMentionMap(redditData, webData, appleCharts, lastfmArtists, geniusTrending, lastfmBaselines, lastfmTracks, shazamChart, spotifyChart, hypemData, tiktokChart) {
   const map = new Map(); // normalizedName → entity object
 
   function getOrCreate(rawName) {
@@ -133,6 +140,15 @@ function buildMentionMap(redditData, webData, appleCharts, lastfmArtists, genius
     if (e) e.hypemSignal = { blogs, loved };
   }
 
+  // TikTok US chart — strong virality/discovery signal
+  for (const { artist, rank } of (tiktokChart || [])) {
+    const e = getOrCreate(artist);
+    if (e) {
+      const prev = e.chartPositions.tiktok;
+      if (prev == null || rank < prev) e.chartPositions.tiktok = rank;
+    }
+  }
+
   // Match editorial articles against all known artists by title scan
   for (const { source, items } of webData) {
     for (const item of items) {
@@ -184,16 +200,19 @@ function calcChartScore(entity) {
   if (entity.chartPositions.shazam != null) {
     score += 0.40 * (1 - (entity.chartPositions.shazam - 1) / 49);
   }
-  if (entity.chartPositions.apple != null) {
-    score += 0.25 * (1 - (entity.chartPositions.apple - 1) / 99);
+  // TikTok US: strong virality/discovery signal
+  if (entity.chartPositions.tiktok != null) {
+    score += 0.20 * (1 - (entity.chartPositions.tiktok - 1) / 49);
   }
+  if (entity.chartPositions.apple != null) {
+    score += 0.20 * (1 - (entity.chartPositions.apple - 1) / 99);
+  }
+  // Removed additive constants — any rank now scores proportionally (0 at bottom)
   if (entity.chartPositions.lastfm != null) {
-    const rank = entity.chartPositions.lastfm;
-    score += 0.15 + 0.20 * (1 - (rank - 1) / 49);
+    score += 0.20 * (1 - (entity.chartPositions.lastfm - 1) / 49);
   }
   if (entity.chartPositions.lastfm_track != null) {
-    const rank = entity.chartPositions.lastfm_track;
-    score += 0.10 + 0.15 * (1 - (rank - 1) / 49);
+    score += 0.15 * (1 - (entity.chartPositions.lastfm_track - 1) / 49);
   }
   if (entity.chartPositions.spotify != null) {
     score += 0.10 * (1 - (entity.chartPositions.spotify - 1) / 199);
@@ -232,7 +251,7 @@ function calcVelocityScore(entity) {
     signals.push(Math.max(0, Math.min(1, (current - baseline) / baseline)));
   }
 
-  if (entity.geniusTrending?.rank >= 1 && entity.geniusTrending.rank <= 50) {
+  if (entity.geniusTrending?.rank != null && entity.geniusTrending.rank <= 50) {
     signals.push(1 - (entity.geniusTrending.rank - 1) / 49);
   }
 
@@ -280,28 +299,23 @@ function updateBaselines(lastfmArtists) {
 }
 
 // ── Main entry point ─────────────────────────────────────────────────────────
-function score(redditData, webData, appleCharts, lastfmArtists, geniusTrending, lastfmTracks = [], shazamChart = [], spotifyChart = [], hypemData = []) {
+function score(redditData, webData, appleCharts, lastfmArtists, geniusTrending, lastfmTracks = [], shazamChart = [], spotifyChart = [], hypemData = [], tiktokChart = []) {
   const db = getDb();
   const rows = db.prepare('SELECT artist_name, listeners FROM artist_baselines').all();
   const lastfmBaselines = Object.fromEntries(rows.map(r => [r.artist_name, r.listeners]));
 
   const mentionMap = buildMentionMap(
     redditData, webData, appleCharts, lastfmArtists, geniusTrending, lastfmBaselines, lastfmTracks,
-    shazamChart, spotifyChart, hypemData
+    shazamChart, spotifyChart, hypemData, tiktokChart
   );
-
-  // Raw community scores — needed for normalization across all artists
-  const rawCommunity = new Map();
-  for (const [key, entity] of mentionMap.entries()) {
-    rawCommunity.set(key, calcCommunityRaw(entity));
-  }
-  const maxCommunity = Math.max(...rawCommunity.values(), 1);
 
   const scored = [];
   for (const [key, entity] of mentionMap.entries()) {
     const chart     = calcChartScore(entity);
     const editorial = calcEditorialScore(entity);
-    const community = rawCommunity.get(key) / maxCommunity;
+    // Fixed ceiling normalization — prevents one viral outlier from collapsing
+    // all other artists' community scores on a given day.
+    const community = Math.min(calcCommunityRaw(entity) / COMMUNITY_CEILING, 1);
     const velocity  = calcVelocityScore(entity);
     const total = chart * WEIGHTS.chart + editorial * WEIGHTS.editorial
       + community * WEIGHTS.community + velocity * WEIGHTS.velocity;
@@ -313,8 +327,11 @@ function score(redditData, webData, appleCharts, lastfmArtists, geniusTrending, 
     .filter(s => s.chart >= THRESHOLDS.breaking_chart && s.total >= THRESHOLDS.breaking_total)
     .sort((a, b) => b.total - a.total);
 
+  // Exclude breaking artists from rising so chart-dominant acts with limited press
+  // still appear rather than falling through both filters.
+  const breakingKeys = new Set(breaking.map(s => s.entity.normalizedName));
   const rising = scored
-    .filter(s => s.total >= THRESHOLDS.rising_total && s.chart < THRESHOLDS.breaking_chart)
+    .filter(s => !breakingKeys.has(s.entity.normalizedName) && s.total >= THRESHOLDS.rising_total)
     .sort((a, b) => b.total - a.total);
 
   console.log(`[scorer] ${breaking.length} breaking, ${rising.length} rising`);
