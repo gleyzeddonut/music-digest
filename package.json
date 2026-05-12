@@ -1,7 +1,7 @@
 {
   "name": "music-digest",
-  "version": "1.0.2",
-  "description": "Daily music buzz digest \u2014 scrape, summarize, playlist, deliver",
+  "version": "1.0.3",
+  "description": "Daily music buzz digest — scrape, summarize, playlist, deliver",
   "main": "electron/main.js",
   "scripts": {
     "start": "node index.js",
