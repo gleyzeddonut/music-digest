@@ -2,7 +2,7 @@ const express = require('express');
 const path = require('path');
 const { getDb } = require('../db/init');
 const { runDigest } = require('../processor/digest');
-const { getAuthUrl, handleCallback, isConnected, getPlaylistUrl } = require('../processor/spotify');
+const { getAuthUrl, handleCallback, isConnected, getPlaylistUrl, getAccessToken } = require('../processor/spotify');
 const { sendDigestEmail } = require('./email');
 
 // config-store is only available and callable in Electron context
@@ -98,9 +98,38 @@ router.post('/api/settings/config', (req, res) => {
 
 // ── Spotify OAuth ─────────────────────────────────────────────
 
-router.get('/auth/spotify', async (req, res) => {
+function callbackPage(status, message) {
+  const ok = status === 'success';
+  return `<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>
+  body { font-family: -apple-system, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #0a0a0a; color: #e0e0e0; }
+  .box { text-align: center; }
+  .icon { font-size: 48px; margin-bottom: 16px; }
+  p { margin: 0; font-size: 15px; opacity: 0.7; }
+</style>
+</head><body><div class="box">
+  <div class="icon">${ok ? '✓' : '✕'}</div>
+  <p>${message}</p>
+</div>
+<script>window.close();</script>
+</body></html>`;
+}
+
+// Returns the Spotify auth URL as JSON so the frontend can open it externally
+router.get('/auth/spotify/url', async (req, res) => {
   try {
-    res.redirect(await getAuthUrl());
+    res.json({ url: await getAuthUrl() });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/auth/spotify', async (req, res) => {
+  console.log('[auth] /auth/spotify hit — referer:', req.headers.referer, 'user-agent:', req.headers['user-agent']?.slice(0, 60));
+  try {
+    const url = await getAuthUrl();
+    console.log('[auth] redirecting to:', url.slice(0, 80));
+    res.redirect(url);
   } catch (err) {
     res.send(`<script>window.location='/?spotify_error=${encodeURIComponent(err.message)}'</script>`);
   }
@@ -108,12 +137,35 @@ router.get('/auth/spotify', async (req, res) => {
 
 router.get('/auth/spotify/callback', async (req, res) => {
   const { code, error } = req.query;
-  if (error) return res.send(`<script>window.location='/?spotify_error=${error}'</script>`);
+  if (error) return res.send(callbackPage('error', `Spotify error: ${error}`));
   try {
     await handleCallback(code);
-    res.send(`<script>window.location='/?spotify_connected=1'</script>`);
+    res.send(callbackPage('success', 'Spotify connected! You can close this tab.'));
   } catch (err) {
-    res.send(`<script>window.location='/?spotify_error=${encodeURIComponent(err.message)}'</script>`);
+    res.send(callbackPage('error', err.message));
+  }
+});
+
+router.delete('/auth/spotify', (req, res) => {
+  const db = getDb();
+  const del = (k) => db.prepare('DELETE FROM settings WHERE key = ?').run(k);
+  del('spotify_access_token');
+  del('spotify_refresh_token');
+  del('spotify_token_expires_at');
+  del('spotify_playlist_id');
+  db.prepare('DELETE FROM playlist_tracks').run();
+  res.json({ ok: true });
+});
+
+// ── Spotify token (for Web Playback SDK) ──────────────────────
+
+router.get('/api/spotify/token', async (req, res) => {
+  try {
+    const token = await getAccessToken();
+    if (!token) return res.status(401).json({ error: 'Not authenticated' });
+    res.json({ token });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -166,6 +218,13 @@ router.get('/api/digests', (req, res) => {
   res.json({ digests: digests.map(parseDigest), total, page });
 });
 
+router.get('/api/playlist_tracks', (req, res) => {
+  const tracks = getDb()
+    .prepare('SELECT track_id AS spotify_id, track_name AS title, artist_name AS artist, added_at, digest_date FROM playlist_tracks ORDER BY added_at DESC')
+    .all();
+  res.json({ tracks });
+});
+
 // ── Sources API ───────────────────────────────────────────────
 
 router.get('/api/sources', (req, res) => {
@@ -176,7 +235,7 @@ router.get('/api/sources', (req, res) => {
 router.post('/api/sources', (req, res) => {
   const { type, name, url, selector } = req.body;
   if (!type || !name || !url) return res.status(400).json({ error: 'type, name, url required' });
-  if (!['reddit', 'rss', 'html', 'tiktok', 'spotify-playlist'].includes(type)) return res.status(400).json({ error: 'type must be reddit, rss, html, tiktok, or spotify-playlist' });
+  if (!['reddit', 'rss', 'html', 'tiktok', 'spotify-playlist', 'tokchart'].includes(type)) return res.status(400).json({ error: 'Invalid source type' });
 
   try {
     const result = getDb().prepare(
@@ -218,11 +277,14 @@ router.post('/api/sources/:id/test', async (req, res) => {
     } else if (source.type === 'tiktok') {
       const { scrapeTikTok } = require('../scraper/tiktok');
       const result = await scrapeTikTok([source]);
-      items = result[0]?.items || [];
+      items = result.formatted?.[0]?.items || [];
     } else if (source.type === 'spotify-playlist') {
       const { scrapeSpotifyPlaylists } = require('../scraper/spotifyPlaylist');
       const result = await scrapeSpotifyPlaylists([source]);
       items = result[0]?.items || [];
+    } else if (source.type === 'tokchart') {
+      const { scrapeTokchart } = require('../scraper/tokchart');
+      items = await scrapeTokchart();
     } else {
       const { scrapeWeb } = require('../scraper/web');
       const result = await scrapeWeb([source]);
@@ -254,8 +316,16 @@ router.get('/api/settings', (req, res) => {
     spotify: {
       connected: isConnected(),
       playlistUrl: getPlaylistUrl(),
+      playlistName: db_get('spotify_playlist_name', '🎵 Music Digest'),
     },
   });
+});
+
+router.post('/api/settings/spotify-playlist-name', (req, res) => {
+  const { name } = req.body;
+  if (!name || !name.trim()) return res.status(400).json({ error: 'Name required' });
+  getDb().prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('spotify_playlist_name', name.trim());
+  res.json({ ok: true });
 });
 
 // ── Schedule settings ─────────────────────────────────────────
@@ -332,6 +402,7 @@ router.get('/api/status', (req, res) => {
   const db = getDb();
   const lastDigest = db.prepare('SELECT date, created_at FROM digests ORDER BY date DESC LIMIT 1').get();
   const config = require('../config');
+  const digestTo = db.prepare("SELECT value FROM settings WHERE key = 'digest_to'").get()?.value || config.DIGEST_TO || '';
   res.json({
     spotify: { connected: isConnected(), playlistUrl: getPlaylistUrl() },
     lastDigest: lastDigest || null,
@@ -340,6 +411,7 @@ router.get('/api/status', (req, res) => {
     sourcesCount: db.prepare('SELECT COUNT(*) as n FROM sources WHERE enabled = 1').get().n,
     tracksInPlaylist: db.prepare('SELECT COUNT(*) as n FROM playlist_tracks').get().n,
     userName: db.prepare("SELECT value FROM settings WHERE key = 'user_name'").get()?.value || '',
+    configured: !!digestTo,
   });
 });
 

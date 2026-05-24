@@ -45,21 +45,26 @@ const DEFAULT_SOURCES = [
   { type: 'rss', name: 'Uproxx Music',         url: 'https://uproxx.com/music/feed/' },
   // TikTok Ads API (creative_radar_api) discontinued — removed
   // Spotify Viral 50 playlist discontinued by Spotify in 2023 — removed
+  // Scrapers with fixed URLs (no user config needed)
+  { type: 'tiktok',   name: 'TikTok Charts', url: 'https://kworb.net/charts/tiktok/us.html' },
+  { type: 'tokchart', name: 'Tokchart',       url: 'https://tokchart.com' },
 ];
 
 function initDb() {
   const db = getDb();
 
-  // Migration: extend sources type to include 'tiktok' and 'spotify-playlist'
+  const NEW_TYPES = "'reddit','rss','html','tiktok','spotify-playlist','tokchart'";
+
+  // Migration: extend sources type constraint whenever a new type is added
   const tableInfo = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='sources'").get();
   const needsMigration = tableInfo && (
-    !tableInfo.sql.includes("'tiktok'") || !tableInfo.sql.includes("'spotify-playlist'")
+    !tableInfo.sql.includes("'tiktok'") || !tableInfo.sql.includes("'spotify-playlist'") || !tableInfo.sql.includes("'tokchart'")
   );
   if (needsMigration) {
     db.exec(`ALTER TABLE sources RENAME TO _sources_old`);
     db.exec(`CREATE TABLE sources (
       id        INTEGER PRIMARY KEY AUTOINCREMENT,
-      type      TEXT NOT NULL CHECK(type IN ('reddit','rss','html','tiktok','spotify-playlist')),
+      type      TEXT NOT NULL CHECK(type IN (${NEW_TYPES})),
       name      TEXT NOT NULL,
       url       TEXT NOT NULL,
       selector  TEXT,
@@ -68,13 +73,13 @@ function initDb() {
     )`);
     db.exec(`INSERT INTO sources SELECT * FROM _sources_old`);
     db.exec(`DROP TABLE _sources_old`);
-    console.log('[db] Migrated sources: added tiktok + spotify-playlist types');
+    console.log('[db] Migrated sources: updated type constraint');
   }
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS sources (
       id        INTEGER PRIMARY KEY AUTOINCREMENT,
-      type      TEXT NOT NULL CHECK(type IN ('reddit','rss','html','tiktok','spotify-playlist')),
+      type      TEXT NOT NULL CHECK(type IN ('reddit','rss','html','tiktok','spotify-playlist','tokchart')),
       name      TEXT NOT NULL,
       url       TEXT NOT NULL,
       selector  TEXT,

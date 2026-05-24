@@ -1,6 +1,6 @@
 const supabase = require('../supabase-client');
 
-function buildPrompt(date, redditData, webData, tiktokData = [], playlistData = [], scoredData = null) {
+function buildPrompt(date, redditData, webData, tiktokData = [], playlistData = [], scoredData = null, tokchartData = []) {
   const lines = [`TODAY'S DATE: ${date}\n`];
 
   if (scoredData && (scoredData.breaking.length > 0 || scoredData.rising.length > 0)) {
@@ -67,6 +67,15 @@ function buildPrompt(date, redditData, webData, tiktokData = [], playlistData = 
     }
   }
 
+  if (tokchartData.length > 0) {
+    lines.push('\n=== TOKCHART — TOP TRENDING TIKTOK SONGS (score 1–1000) ===');
+    for (const t of tokchartData) {
+      const plays = t.plays ? ` · ${t.plays} plays` : '';
+      const country = t.topCountry ? ` · top country: ${t.topCountry}` : '';
+      lines.push(`  • ${t.title} — ${t.artist} [score ${t.score}${plays}${country}]`);
+    }
+  }
+
   lines.push('\n=== MUSIC NEWS (use the index numbers in your headlines response) ===');
   let idx = 0;
   for (const { source, items } of webData) {
@@ -81,14 +90,14 @@ function buildPrompt(date, redditData, webData, tiktokData = [], playlistData = 
   return lines.join('\n');
 }
 
-async function processWithClaude(date, redditData, webData, tiktokData = [], playlistData = [], scoredData = null) {
+async function processWithClaude(date, redditData, webData, tiktokData = [], playlistData = [], scoredData = null, tokchartData = []) {
   // If the user stored their own API key, use the SDK directly; otherwise go through the shared proxy.
   let ownKey = null;
   if (process.versions.electron) {
     try { ownKey = require('../electron/config-store').getConfig('claude_api_key'); } catch {}
   }
 
-  const rawContent = buildPrompt(date, redditData, webData, tiktokData, playlistData, scoredData);
+  const rawContent = buildPrompt(date, redditData, webData, tiktokData, playlistData, scoredData, tokchartData);
   console.log('[claude] Sending to API (this can take up to a minute)...');
 
   const systemPrompt = `You are a music industry analyst creating a daily briefing. Your job is to surface what is genuinely generating buzz today, stated plainly.

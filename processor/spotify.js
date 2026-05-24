@@ -4,7 +4,7 @@ const config   = require('../config');
 const { getDb } = require('../db/init');
 
 const API_BASE = 'https://api.spotify.com/v1';
-const PLAYLIST_NAME = '🎵 Music Digest';
+const DEFAULT_PLAYLIST_NAME = '🎵 Music Digest';
 const PLAYLIST_DESC = 'Daily music discoveries. Auto-updated by Music Digest.';
 
 // ── DB helpers ────────────────────────────────────────────────
@@ -88,13 +88,20 @@ function spotifyApi(token) {
 
 async function getOrCreatePlaylist(api) {
   const existingId = getSetting('spotify_playlist_id');
+  const name = getSetting('spotify_playlist_name') || DEFAULT_PLAYLIST_NAME;
   const { data: me } = await api.get('/me');
 
   if (existingId) {
     try {
       const { data: pl } = await api.get(`/playlists/${existingId}`);
-      // Only reuse if the connected user owns it
-      if (pl.owner?.id === me.id) return existingId;
+      if (pl.owner?.id === me.id) {
+        // Rename on Spotify if the user changed the name
+        if (pl.name !== name) {
+          await api.put(`/playlists/${existingId}`, { name });
+          console.log(`[spotify] Renamed playlist to "${name}"`);
+        }
+        return existingId;
+      }
       console.log('[spotify] Stored playlist belongs to a different account — creating new one');
     } catch {
       // Playlist deleted or inaccessible — fall through to create
@@ -103,13 +110,15 @@ async function getOrCreatePlaylist(api) {
   }
 
   const { data: playlist } = await api.post(`/users/${me.id}/playlists`, {
-    name: PLAYLIST_NAME,
+    name,
     description: PLAYLIST_DESC,
     public: true,
   });
 
   setSetting('spotify_playlist_id', playlist.id);
-  console.log(`[spotify] Created playlist: ${playlist.external_urls.spotify}`);
+  // New playlist — local dedup records from any previous playlist are now stale
+  getDb().prepare('DELETE FROM playlist_tracks').run();
+  console.log(`[spotify] Created playlist "${name}": ${playlist.external_urls.spotify}`);
   return playlist.id;
 }
 
@@ -141,7 +150,7 @@ async function appendSongsToPlaylist(songs, date) {
   }
 
   // Only add songs with corroborating signal: on any chart OR mentioned in 2+ sources
-  const eligible = songs.filter(s => s.lfm_rank || s.genius_rank || s.shazam_rank || s.spotify_rank || (s.sources?.length || 0) >= 2);
+  const eligible = songs.filter(s => s.lfm_rank || s.genius_rank || s.shazam_rank || s.spotify_rank || s.apple_rank || s.tokchart_score || (s.sources?.length || 0) >= 2);
   const skipped  = songs.length - eligible.length;
   if (skipped > 0) console.log(`[spotify] Skipping ${skipped} low-signal song(s)`);
   songs = eligible;
@@ -156,7 +165,7 @@ async function appendSongsToPlaylist(songs, date) {
 
   const added = [];
   const unmatched = [];
-  const urisToAdd = [];
+  const tracksToAdd = [];
 
   for (const song of songs) {
     await new Promise(r => setTimeout(r, 300));
@@ -173,17 +182,21 @@ async function appendSongsToPlaylist(songs, date) {
       continue;
     }
 
-    urisToAdd.push(track.uri);
-    insertTrack.run(track.id, track.name, track.artists[0]?.name, date);
-    added.push({ title: track.name, artist: track.artists[0]?.name, id: track.id, preview_url: track.preview_url || null });
+    tracksToAdd.push({ uri: track.uri, id: track.id, name: track.name, artist: track.artists[0]?.name, preview_url: track.preview_url || null });
     console.log(`[spotify] Queued: "${track.name}" by ${track.artists[0]?.name}`);
   }
 
-  if (urisToAdd.length > 0) {
-    for (let i = 0; i < urisToAdd.length; i += 100) {
-      await api.post(`/playlists/${playlistId}/tracks`, { uris: urisToAdd.slice(i, i + 100) });
+  if (tracksToAdd.length > 0) {
+    const uris = tracksToAdd.map(t => t.uri);
+    for (let i = 0; i < uris.length; i += 100) {
+      await api.post(`/playlists/${playlistId}/tracks`, { uris: uris.slice(i, i + 100) });
     }
-    console.log(`[spotify] Added ${urisToAdd.length} tracks to playlist`);
+    // Only mark as added in local DB after Spotify confirms them
+    for (const t of tracksToAdd) {
+      insertTrack.run(t.id, t.name, t.artist, date);
+      added.push({ title: t.name, artist: t.artist, id: t.id, preview_url: t.preview_url });
+    }
+    console.log(`[spotify] Added ${tracksToAdd.length} tracks to playlist`);
   }
 
   const playlistUrl = `https://open.spotify.com/playlist/${playlistId}`;
@@ -229,4 +242,4 @@ async function fetchPlaylistTracks(playlistId) {
   return items;
 }
 
-module.exports = { getAuthUrl, handleCallback, appendSongsToPlaylist, isConnected, getPlaylistUrl, fetchPlaylistTracks };
+module.exports = { getAuthUrl, handleCallback, appendSongsToPlaylist, isConnected, getPlaylistUrl, fetchPlaylistTracks, getAccessToken };

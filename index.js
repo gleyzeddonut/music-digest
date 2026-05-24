@@ -10,6 +10,19 @@ const config = require('./config');
 
 const app = express();
 app.use(express.json());
+
+// Dev-only CORS so Vite (:5173) can call Express (:3000)
+if (process.env.NODE_ENV === 'development') {
+  app.use((req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', 'http://localhost:5173');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,DELETE,OPTIONS');
+    if (req.method === 'OPTIONS') return res.sendStatus(204);
+    next();
+  });
+}
+
 // Routes BEFORE static — allows GET / guard in routes.js to redirect before
 // express.static serves public/index.html
 app.use('/', routes);

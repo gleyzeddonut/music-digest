@@ -1,13 +1,16 @@
 {
   "name": "music-digest",
-  "version": "1.0.3",
+  "version": "1.1.0",
   "description": "Daily music buzz digest — scrape, summarize, playlist, deliver",
   "main": "electron/main.js",
   "scripts": {
-    "start": "node index.js",
-    "dev": "node --watch index.js",
+    "dev:ui": "vite",
+    "dev:srv": "NODE_ENV=development node index.js",
+    "dev": "concurrently -k -n ui,srv,electron -c blue,green,magenta \"npm:dev:ui\" \"npm:dev:srv\" \"wait-on http://localhost:5173 && electron .\"",
+    "build:ui": "vite build",
+    "start": "npm run build:ui && node index.js",
     "electron": "electron-rebuild -f -w better-sqlite3 && codesign --sign - --force node_modules/better-sqlite3/build/Release/better_sqlite3.node && electron .",
-    "dist": "electron-builder --mac"
+    "dist": "npm run build:ui && electron-builder --mac"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.30.0",
@@ -21,7 +24,15 @@
     "rss-parser": "^3.13.0"
   },
   "devDependencies": {
+    "@vitejs/plugin-react": "^4.2.0",
+    "concurrently": "^8.2.0",
     "electron": "^33.4.11",
-    "electron-builder": "^25.1.8"
+    "electron-builder": "^25.1.8",
+    "vite": "^5.0.0",
+    "wait-on": "^7.2.0"
+  },
+  "optionalDependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
   }
 }

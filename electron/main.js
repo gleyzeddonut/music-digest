@@ -1,5 +1,6 @@
 const { app, BrowserWindow, Tray, Menu, nativeImage, shell, globalShortcut, MenuItem } = require('electron');
 const path = require('path');
+const fs = require('fs');
 
 let mainWindow = null;
 let tray = null;
@@ -74,7 +75,7 @@ function createWindow(setupNeeded) {
   mainWindow = new BrowserWindow({
     width: 1100,
     height: 800,
-    minWidth: 800,
+    minWidth: 780,
     minHeight: 600,
     title: 'Music Digest',
     webPreferences: {
@@ -83,7 +84,12 @@ function createWindow(setupNeeded) {
     },
   });
 
-  mainWindow.loadURL(`http://localhost:3000${setupNeeded ? '/setup' : ''}`);
+  if (process.env.NODE_ENV === 'development') {
+    mainWindow.loadURL('http://localhost:5173');
+    mainWindow.webContents.openDevTools({ mode: 'detach' });
+  } else {
+    mainWindow.loadURL(`http://localhost:3000${setupNeeded ? '/setup' : ''}`);
+  }
 
   // Hide instead of close so the scheduler keeps running
   mainWindow.on('close', (e) => {
@@ -94,8 +100,29 @@ function createWindow(setupNeeded) {
 
   // Open external links in the default browser, not in the app
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    console.log('[electron] setWindowOpenHandler url:', url);
     shell.openExternal(url);
     return { action: 'deny' };
+  });
+
+  // Intercept any navigation away from localhost and open it externally instead
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    console.log('[electron] will-navigate url:', url);
+    if (!url.startsWith('http://localhost:')) {
+      console.log('[electron] blocking navigation, opening externally:', url);
+      event.preventDefault();
+      shell.openExternal(url);
+    }
+  });
+
+  // Catch server-side 302 redirects (e.g. /auth/spotify → accounts.spotify.com)
+  mainWindow.webContents.on('will-redirect', (event, url) => {
+    console.log('[electron] will-redirect url:', url);
+    if (!url.startsWith('http://localhost:')) {
+      console.log('[electron] blocking redirect, opening externally:', url);
+      event.preventDefault();
+      shell.openExternal(url);
+    }
   });
 }
 

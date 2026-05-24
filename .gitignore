@@ -8,3 +8,4 @@ assets/icon.iconset/
 *.log
 npm-debug.log*
 out/
+supabase/.temp/

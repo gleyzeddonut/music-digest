@@ -5,7 +5,7 @@ const CORS = {
 
 const TOKEN_URL = 'https://accounts.spotify.com/api/token'
 const AUTH_URL  = 'https://accounts.spotify.com/authorize'
-const SCOPES    = 'playlist-modify-public playlist-modify-private playlist-read-private'
+const SCOPES    = 'playlist-modify-public playlist-modify-private playlist-read-private streaming user-read-private user-read-email user-modify-playback-state user-read-playback-state'
 
 function creds() {
   return btoa(`${Deno.env.get('SPOTIFY_CLIENT_ID')}:${Deno.env.get('SPOTIFY_CLIENT_SECRET')}`)

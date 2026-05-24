@@ -18,7 +18,9 @@ async function fetchViaEmbed(playlistId) {
   const match = data.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
   if (!match) throw new Error('__NEXT_DATA__ not found in embed page');
   const json = JSON.parse(match[1]);
-  const entity = json?.props?.pageProps?.state?.data?.entity;
+  const pageProps = json?.props?.pageProps;
+  if (pageProps?.status === 404) throw new Error('Playlist not found on Spotify (404) — it may have been removed');
+  const entity = pageProps?.state?.data?.entity;
   if (!entity?.trackList) throw new Error('trackList missing in embed data');
   return {
     name: entity.name,
