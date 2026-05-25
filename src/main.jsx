@@ -14,6 +14,7 @@ import {
   Onboarding,
   LoadingShell,
 } from './screens.jsx';
+import { WelcomeScreen } from './WelcomeScreen.jsx';
 
 // ── Data adapter ──────────────────────────────────────────────────────────────
 
@@ -388,12 +389,7 @@ function App() {
           running={running}
         />
       ) : (
-        <div className="empty-state">
-          <p>No digest yet.</p>
-          <button className="btn btn-primary" onClick={() => handleRun(true)}>
-            Run First Digest
-          </button>
-        </div>
+        <WelcomeScreen />
       );
       break;
   }
