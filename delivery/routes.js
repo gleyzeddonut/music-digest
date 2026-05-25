@@ -186,10 +186,12 @@ router.get('/api/digests/:date', (req, res) => {
 
 router.post('/api/digests/:date/resend', async (req, res) => {
   const config = require('../config');
-  if (!config.SMTP_USER || !config.SMTP_PASS) {
-    return res.status(400).json({ error: 'Email not configured — add SMTP credentials in settings' });
-  }
   const db = getDb();
+  const smtpUser = db.prepare("SELECT value FROM settings WHERE key = 'smtp_user'").get()?.value || config.SMTP_USER;
+  const smtpPass = db.prepare("SELECT value FROM settings WHERE key = 'smtp_pass'").get()?.value || config.SMTP_PASS;
+  if (!smtpUser || !smtpPass) {
+    return res.status(400).json({ error: 'Email not configured — add SMTP credentials in Settings → Delivery' });
+  }
   const row = db.prepare('SELECT * FROM digests WHERE date = ?').get(req.params.date);
   if (!row) return res.status(404).json({ error: 'Digest not found' });
 
@@ -216,6 +218,64 @@ router.get('/api/digests', (req, res) => {
   const digests = db.prepare('SELECT * FROM digests ORDER BY date DESC LIMIT ? OFFSET ?').all(limit, offset);
   const total = db.prepare('SELECT COUNT(*) as n FROM digests').get().n;
   res.json({ digests: digests.map(parseDigest), total, page });
+});
+
+router.get('/api/monthly/:year/:month', (req, res) => {
+  const { year, month } = req.params;
+  const db = getDb();
+  const prefix = `${year}-${String(month).padStart(2, '0')}`;
+  const label = new Date(parseInt(year, 10), parseInt(month, 10) - 1, 1)
+    .toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+  const rows = db.prepare(
+    'SELECT date, artists, songs, headlines FROM digests WHERE date LIKE ? ORDER BY date ASC'
+  ).all(`${prefix}-%`);
+
+  if (rows.length === 0) {
+    return res.json({ month: label, monthKey: prefix, digestCount: 0, headlineCount: 0, artists: [], songs: [] });
+  }
+
+  const artistMap = new Map();
+  const songMap   = new Map();
+  let headlineCount = 0;
+
+  for (const row of rows) {
+    const artists  = safeJson(row.artists,  []);
+    const songs    = safeJson(row.songs,    []);
+    const headlines = safeJson(row.headlines, []);
+    headlineCount += headlines.length;
+
+    for (const a of artists) {
+      if (!a.name) continue;
+      const key = a.name.toLowerCase();
+      if (!artistMap.has(key)) artistMap.set(key, { name: a.name, count: 0, reasons: [], tier: a.tier || 'rising' });
+      const e = artistMap.get(key);
+      e.count++;
+      if (a.reason) e.reasons.push(a.reason);
+      if (a.tier === 'breaking') e.tier = 'breaking';
+    }
+
+    for (const s of songs) {
+      if (!s.title) continue;
+      const key = `${s.title.toLowerCase()}::${(s.artist || '').toLowerCase()}`;
+      if (!songMap.has(key)) songMap.set(key, { title: s.title, artist: s.artist || '', count: 0 });
+      songMap.get(key).count++;
+    }
+  }
+
+  const artists = [...artistMap.values()].sort((a, b) => b.count - a.count);
+  const songs   = [...songMap.values()].sort((a, b) => b.count - a.count).slice(0, 20);
+
+  res.json({
+    month: label,
+    monthKey: prefix,
+    digestCount: rows.length,
+    headlineCount,
+    artists,
+    songs,
+    topArtist: artists[0] || null,
+    topSong:   songs[0]   || null,
+  });
 });
 
 router.get('/api/playlist_tracks', (req, res) => {
@@ -304,6 +364,8 @@ router.get('/api/settings', (req, res) => {
   const dbSettings = Object.fromEntries(rows.map(r => [r.key, r.value]));
   const config = require('../config');
   const db_get = (key, fallback) => { const v = dbSettings[key]; return v != null ? v : fallback; };
+  const smtpUser = db_get('smtp_user', '') || config.SMTP_USER;
+  const smtpConfigured = !!(smtpUser && (db_get('smtp_pass', '') || config.SMTP_PASS));
   res.json({
     email:           db_get('digest_to',            config.DIGEST_TO),
     sendTime:        db_get('schedule_send_time',   config.SEND_TIME),
@@ -312,13 +374,26 @@ router.get('/api/settings', (req, res) => {
     monthDate:       parseInt(db_get('schedule_month_date', '1'),  10),
     scheduleEnabled: db_get('schedule_enabled', '1') !== '0',
     userName:        db_get('user_name', ''),
-    timezone: config.TIMEZONE,
+    timezone:        config.TIMEZONE,
+    smtpUser,
+    smtpConfigured,
     spotify: {
       connected: isConnected(),
       playlistUrl: getPlaylistUrl(),
       playlistName: db_get('spotify_playlist_name', '🎵 Music Digest'),
     },
   });
+});
+
+router.post('/api/settings/smtp', (req, res) => {
+  const { user, pass } = req.body;
+  if (!user?.trim()) return res.status(400).json({ error: 'SMTP user required' });
+  const db = getDb();
+  db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('smtp_user', user.trim());
+  if (pass?.trim()) {
+    db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('smtp_pass', pass.trim());
+  }
+  res.json({ ok: true });
 });
 
 router.post('/api/settings/spotify-playlist-name', (req, res) => {
@@ -421,6 +496,7 @@ function parseDigest(d) {
     artists: safeJson(d.artists, []),
     songs: safeJson(d.songs, []),
     headlines: safeJson(d.headlines, []),
+    mentioned_artists: safeJson(d.mentioned_artists, []),
   };
 }
 

@@ -1,10 +1,10 @@
 import React from 'react';
 import { Icon, CoverArt, Greeting, showToast } from './components.jsx';
-import { api } from './api.js';
+import { api, bgFromName } from './api.js';
 
 // ─── DigestScreen ─────────────────────────────────────────────
 
-export function DigestScreen({ data, onArtistClick, onSongPlay, running }) {
+export function DigestScreen({ data, onArtistClick, onSongPlay, onReadBrief, running }) {
   if (!data) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '70vh', textAlign: 'center', padding: '48px' }}>
@@ -94,11 +94,31 @@ export function DigestScreen({ data, onArtistClick, onSongPlay, running }) {
               <div className="section-eyebrow">This week</div>
               <h2 className="section-title">The brief</h2>
             </div>
-            <span className="section-sub">{issue?.date}</span>
+            <button className="btn-read-feature" onClick={onReadBrief}>
+              Read brief →
+            </button>
           </div>
           <div className="brief">
             <div className="brief-body">
-              {brief.map((p, i) => <p key={i}>{p}</p>)}
+              {(() => {
+                const bullets = (brief || []).flatMap(block =>
+                  block.split('\n').map(l => l.trim()).filter(l => l.startsWith('•')).map(l => l.replace(/^•\s*/, ''))
+                ).filter(Boolean);
+                const preview = bullets.slice(0, 2);
+                const remaining = bullets.length - preview.length;
+                return (
+                  <>
+                    <ul className="brief-bullets">
+                      {preview.map((line, i) => <li key={i}>{line}</li>)}
+                    </ul>
+                    {remaining > 0 && (
+                      <button className="brief-more" onClick={onReadBrief}>
+                        +{remaining} more {remaining === 1 ? 'story' : 'stories'} →
+                      </button>
+                    )}
+                  </>
+                );
+              })()}
             </div>
             {briefPulls?.length > 0 && (
               <div className="brief-pulls">
@@ -132,24 +152,10 @@ export function DigestScreen({ data, onArtistClick, onSongPlay, running }) {
           <div className="artists-grid">
             {artists.map((a, i) => (
               <div key={i} className="artist-card" onClick={() => onArtistClick(a)}>
-                <div className="num">
-                  <span>{String(i + 1).padStart(2, '0')}</span>
-                  <span className={`tier${(a.tier || '').toLowerCase() === 'rising' ? ' rising' : ''}`}>
-                    {(a.tier || 'BREAKING').toUpperCase()}
-                  </span>
-                </div>
                 <div className="artist-portrait">
                   <CoverArt initials={(a.name || '').slice(0, 2)} bg={a.bg} src={a.src} />
                 </div>
                 <div className="name">{a.name}</div>
-                <div className="reason">{a.reason}</div>
-                {a.sig?.length > 0 && (
-                  <div className="signal-chips">
-                    {a.sig.map((s, j) => (
-                      <span key={j} className={`chip ${s}`}>{s}</span>
-                    ))}
-                  </div>
-                )}
               </div>
             ))}
           </div>
@@ -334,9 +340,9 @@ export function SourcesScreen() {
   const [newSel, setNewSel] = React.useState('');
   const [testing, setTesting] = React.useState({});
 
-  const TYPE_LABELS = { reddit: 'Reddit', rss: 'RSS', html: 'HTML', tiktok: 'TikTok', 'spotify-playlist': 'Spotify', tokchart: 'Tokchart' };
-  const URL_LABEL = { reddit: 'Subreddit slug', rss: 'Feed URL', html: 'Page URL', tiktok: 'Identifier', 'spotify-playlist': 'Playlist URL or ID' };
-  const URL_PH = { reddit: 'indieheads', rss: 'https://…/feed', html: 'https://…', tiktok: 'tiktok://trending', 'spotify-playlist': 'https://open.spotify.com/playlist/…' };
+  const TYPE_LABELS = { reddit: 'Reddit', rss: 'RSS', html: 'HTML', tiktok: 'TikTok', 'spotify-playlist': 'Spotify', tokchart: 'Tokchart', youtube: 'YouTube' };
+  const URL_LABEL = { reddit: 'Subreddit slug', rss: 'Feed URL', html: 'Page URL', tiktok: 'Identifier', 'spotify-playlist': 'Playlist URL or ID', youtube: 'Chart URL' };
+  const URL_PH = { reddit: 'indieheads', rss: 'https://…/feed', html: 'https://…', tiktok: 'tiktok://trending', 'spotify-playlist': 'https://open.spotify.com/playlist/…', youtube: 'https://charts.youtube.com/charts/TrendingVideos/us/RightNow' };
 
   React.useEffect(() => {
     api.sources().then(setSources).catch(() => setSources([]));
@@ -380,13 +386,13 @@ export function SourcesScreen() {
     reload();
   };
 
-  const grouped = { reddit: [], rss: [], html: [], tiktok: [], 'spotify-playlist': [], tokchart: [] };
+  const grouped = { reddit: [], rss: [], html: [], tiktok: [], 'spotify-playlist': [], tokchart: [], youtube: [] };
   for (const s of (sources || [])) {
     if (grouped[s.type] !== undefined) grouped[s.type].push(s);
     else grouped.html.push(s);
   }
 
-  const typeTagClass = { reddit: 't-reddit', rss: 't-rss', html: 't-html', tiktok: 't-html', 'spotify-playlist': 't-spotify', tokchart: 't-html' };
+  const typeTagClass = { reddit: 't-reddit', rss: 't-rss', html: 't-html', tiktok: 't-html', 'spotify-playlist': 't-spotify', tokchart: 't-html', youtube: 't-youtube' };
 
   return (
     <div className="section fade-in" style={{ paddingBottom: 80 }}>
@@ -406,7 +412,7 @@ export function SourcesScreen() {
           onChange={e => { setNewType(e.target.value); setNewUrl(''); setNewSel(''); }}
           style={{ background: 'var(--bg-elev)', border: '1px solid var(--line)', color: 'var(--text)', padding: '8px 12px', borderRadius: 7, font: 'inherit', fontSize: 13, outline: 'none' }}
         >
-          {Object.entries(TYPE_LABELS).filter(([v]) => v !== 'tokchart').map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          {Object.entries(TYPE_LABELS).filter(([v]) => v !== 'tokchart' && v !== 'youtube').map(([v, l]) => <option key={v} value={v}>{l}</option>)}
         </select>
         <input
           className="form-input"
@@ -462,7 +468,7 @@ export function SourcesScreen() {
                   >
                     {testing[s.id] === 'loading' ? '…' : testing[s.id] || 'Test'}
                   </button>
-                  {s.type !== 'tokchart' && (
+                  {s.type !== 'tokchart' && s.type !== 'youtube' && (
                     <button className="del" onClick={() => remove(s.id)} title="Remove">
                       <Icon name="trash" size={13} />
                     </button>
@@ -626,6 +632,33 @@ export function SettingsScreen({ onSpotifyConnect }) {
               style={{ ...inputStyle, width: 160 }}
             />
           </SettingRow>
+          <SettingRow label="SMTP sender">
+            <input
+              type="email"
+              value={settings.smtpUser || ''}
+              onChange={e => setSettings(s => ({ ...s, smtpUser: e.target.value }))}
+              onBlur={e => {
+                const u = e.target.value.trim();
+                if (u) api.saveSmtp(u, '').catch(() => showToast('Failed to save SMTP user'));
+              }}
+              placeholder="you@gmail.com"
+              style={{ ...inputStyle, width: 220 }}
+            />
+          </SettingRow>
+          <SettingRow label="SMTP password">
+            <input
+              type="password"
+              defaultValue=""
+              onBlur={e => {
+                const p = e.target.value.trim();
+                if (p) api.saveSmtp(settings.smtpUser || '', p)
+                  .then(() => showToast('SMTP password saved'))
+                  .catch(() => showToast('Failed to save SMTP password'));
+              }}
+              placeholder={settings.smtpConfigured ? '••••••••' : 'Gmail app password'}
+              style={{ ...inputStyle, width: 220 }}
+            />
+          </SettingRow>
           <SettingRow label="Resend latest">
             <button onClick={resend} style={{ ...inputStyle, cursor: 'pointer', color: 'var(--text-2)' }}>
               ↩ Resend email
@@ -743,6 +776,91 @@ function SettingRow({ label, children }) {
     <div className="set-row">
       <span className="k">{label}</span>
       {children}
+    </div>
+  );
+}
+
+function boldArtistNames(text, names, urlMap = {}) {
+  const boldStyle = { color: 'var(--text)', fontWeight: 600 };
+  const linkStyle = { color: 'inherit', textDecoration: 'none' };
+
+  // Try known artist names first
+  if (names?.length) {
+    const escaped = names.map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    const re = new RegExp(`(${escaped.join('|')})`, 'gi');
+    if (re.test(text)) {
+      re.lastIndex = 0;
+      return text.split(re).map((part, i) => {
+        const match = names.find(n => n.toLowerCase() === part.toLowerCase());
+        if (!match) return part;
+        const url = urlMap[match.toLowerCase()];
+        const bold = <strong key={i} style={boldStyle}>{part}</strong>;
+        return url
+          ? <a key={`a${i}`} href={url} target="_blank" rel="noreferrer" style={linkStyle}>{bold}</a>
+          : bold;
+      });
+    }
+  }
+
+  return text;
+}
+
+// ─── BriefScreen ──────────────────────────────────────────────
+
+export function BriefScreen({ data, onBack, onArtistClick }) {
+  if (!data) return null;
+  const { brief, briefArtistNames, briefArtistSpotifyUrls = {}, artists, issue } = data;
+
+  return (
+    <div className="fade-in">
+      <div className="detail-actions" style={{ marginBottom: 0 }}>
+        <button className="btn-ghost" onClick={onBack}>← Back</button>
+      </div>
+
+      <div className="section" style={{ paddingTop: 12 }}>
+        <div className="section-head">
+          <div>
+            <div className="section-eyebrow">This week</div>
+            <h2 className="section-title">The Brief</h2>
+          </div>
+          {issue?.date && <span className="section-sub">{issue.date}</span>}
+        </div>
+        <div className="brief-full-body">
+          {(brief || []).map((block, i) => {
+            const lines = block.split('\n').map(l => l.trim()).filter(Boolean);
+            const bullets = lines.filter(l => l.startsWith('•'));
+            if (bullets.length > 1 || (bullets.length === 1 && lines.length === 1)) {
+              return (
+                <ul key={i} className="brief-bullets">
+                  {bullets.map((l, j) => <li key={j}>{boldArtistNames(l.replace(/^•\s*/, ''), briefArtistNames, briefArtistSpotifyUrls)}</li>)}
+                </ul>
+              );
+            }
+            return <p key={i}>{boldArtistNames(block, briefArtistNames, briefArtistSpotifyUrls)}</p>;
+          })}
+        </div>
+      </div>
+
+      {artists?.length > 0 && (
+        <div className="section">
+          <div className="section-head">
+            <div>
+              <div className="section-eyebrow">Mentioned</div>
+              <h2 className="section-title">Artists</h2>
+            </div>
+          </div>
+          <div className="artists-grid">
+            {artists.map((a, i) => (
+              <div key={i} className="artist-card" onClick={() => onArtistClick(a)}>
+                <div className="artist-portrait">
+                  <CoverArt initials={(a.name || '').slice(0, 2)} bg={a.bg} src={a.src} />
+                </div>
+                <div className="name">{a.name}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -900,13 +1018,6 @@ export function Onboarding({ onDone }) {
   const [step, setStep] = React.useState(0);
   const STEPS = ['Welcome', 'Spotify', 'Sources', 'Schedule', 'Done'];
 
-  React.useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('spotify_connected')) {
-      setStep(2);
-      history.replaceState({}, '', '/');
-    }
-  }, []);
 
   const next = () => {
     if (step < STEPS.length - 1) setStep(s => s + 1);
@@ -941,7 +1052,7 @@ export function Onboarding({ onDone }) {
         </div>
 
         {step === 0 && <StepWelcome />}
-        {step === 1 && <StepSpotify />}
+        {step === 1 && <StepSpotify onConnected={next} />}
         {step === 2 && <StepSources />}
         {step === 3 && <StepSchedule onDone={next} />}
         {step === 4 && <StepDone onDone={onDone} />}
@@ -977,17 +1088,46 @@ function StepWelcome() {
   );
 }
 
-function StepSpotify() {
+function StepSpotify({ onConnected }) {
+  const [connected, setConnected] = React.useState(false);
+
+  const handleConnect = async () => {
+    try {
+      const authUrl = await api.spotifyAuthUrlJson();
+      window.open(authUrl);
+    } catch {
+      window.open(api.spotifyAuthUrl());
+    }
+  };
+
+  React.useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const s = await api.status();
+        if (s?.spotify?.connected) {
+          setConnected(true);
+          clearInterval(interval);
+          onConnected?.();
+        }
+      } catch {}
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [onConnected]);
+
   return (
     <>
       <h2 className="ob-title">Connect Spotify</h2>
       <p className="ob-desc">
         Music Digest builds a Spotify playlist of every song it discovers — automatically added after each digest.
       </p>
-      <a href="/auth/spotify" className="ob-spotify-btn">
-        <Icon name="spotify" size={16} />
-        Connect your Spotify account
-      </a>
+      {connected ? (
+        <p style={{ color: 'var(--accent)', fontFamily: 'var(--f-mono)', fontSize: 14 }}>✓ Spotify connected — continuing…</p>
+      ) : (
+        <button onClick={handleConnect} className="ob-spotify-btn" style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>
+          <Icon name="spotify" size={16} />
+          Connect your Spotify account
+        </button>
+      )}
       <p style={{ marginTop: 14, fontSize: 12, color: 'var(--muted)', fontFamily: 'var(--f-mono)' }}>
         Read-only for playback · write access only for your playlist
       </p>
@@ -1064,6 +1204,150 @@ function StepDone({ onDone }) {
         Open dashboard →
       </button>
     </>
+  );
+}
+
+// ─── MonthlyScreen ────────────────────────────────────────────
+
+export function MonthlyScreen({ data }) {
+  if (!data) {
+    return (
+      <div style={{ padding: '48px var(--content-pad)', color: 'var(--muted)', fontFamily: 'var(--f-mono)', fontSize: 13 }}>
+        Loading monthly recap…
+      </div>
+    );
+  }
+
+  const { month, digestCount, headlineCount, artists, songs, topArtist, topSong } = data;
+
+  if (digestCount === 0) {
+    return (
+      <div className="fade-in" style={{ padding: '48px var(--content-pad)' }}>
+        <div className="section-eyebrow">Monthly Recap</div>
+        <h2 className="section-title" style={{ marginTop: 4 }}>{month}</h2>
+        <p style={{ color: 'var(--text-2)', marginTop: 16, fontSize: 15 }}>No digests yet this month — check back soon.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fade-in">
+
+      {/* ── Hero ── */}
+      <div className="monthly-hero">
+        <div className="section-eyebrow">Monthly Recap</div>
+        <h1 className="monthly-title">{month}</h1>
+        <div className="monthly-meta-row">
+          <span>{digestCount} {digestCount === 1 ? 'digest' : 'digests'}</span>
+          <span className="dot" />
+          <span>{headlineCount} headlines</span>
+          <span className="dot" />
+          <span>{artists.length} artists</span>
+          <span className="dot" />
+          <span>{songs.length} songs discovered</span>
+        </div>
+      </div>
+
+      {/* ── Top picks ── */}
+      {(topArtist || topSong) && (
+        <div className="section">
+          <div className="monthly-top-grid">
+
+            {topArtist && (
+              <div className="monthly-top-card">
+                <div className="section-eyebrow" style={{ marginBottom: 14 }}>Artist of the Month</div>
+                <div className="monthly-top-artist-row">
+                  <div style={{ width: 52, height: 52, borderRadius: 10, overflow: 'hidden', flexShrink: 0 }}>
+                    <CoverArt initials={(topArtist.name || '').slice(0, 2)} bg={bgFromName(topArtist.name)} />
+                  </div>
+                  <div>
+                    <div className="monthly-top-name">{topArtist.name}</div>
+                    <div className="monthly-top-sub">
+                      Featured {topArtist.count} of {digestCount} {digestCount === 1 ? 'day' : 'days'}
+                    </div>
+                  </div>
+                </div>
+                {topArtist.reasons?.[0] && (
+                  <p className="monthly-top-reason">{topArtist.reasons[0]}</p>
+                )}
+              </div>
+            )}
+
+            {topSong && (
+              <div className="monthly-top-card">
+                <div className="section-eyebrow" style={{ marginBottom: 14 }}>Song of the Month</div>
+                <div className="monthly-top-name">{topSong.title}</div>
+                <div className="monthly-top-artist-name">{topSong.artist}</div>
+                <div className="monthly-top-sub" style={{ marginTop: 8 }}>
+                  Appeared in {topSong.count} of {digestCount} {digestCount === 1 ? 'digest' : 'digests'}
+                </div>
+              </div>
+            )}
+
+          </div>
+        </div>
+      )}
+
+      {/* ── Artists grid ── */}
+      {artists.length > 0 && (
+        <div className="section">
+          <div className="section-head">
+            <div>
+              <div className="section-eyebrow">This Month</div>
+              <h2 className="section-title">Artists</h2>
+            </div>
+          </div>
+          <div className="artists-grid">
+            {artists.slice(0, 8).map((a, i) => (
+              <div key={i} className="artist-card">
+                <div className="artist-portrait">
+                  <CoverArt initials={(a.name || '').slice(0, 2)} bg={bgFromName(a.name)} />
+                </div>
+                <div className="name">{a.name}</div>
+                <div className="monthly-count-badge">{a.count}×</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Top songs ── */}
+      {songs.length > 0 && (
+        <div className="section" style={{ paddingBottom: 80 }}>
+          <div className="section-head">
+            <div>
+              <div className="section-eyebrow">This Month</div>
+              <h2 className="section-title">Top Songs</h2>
+            </div>
+          </div>
+          <div className="songs">
+            {songs.slice(0, 10).map((s, i) => (
+              <div key={i} className="song">
+                <span className="num">{String(i + 1).padStart(2, '0')}</span>
+                <div className="cover">
+                  <CoverArt initials={(s.title || '♪').slice(0, 2)} bg={bgFromName(s.artist)} fontSize="11px" />
+                </div>
+                <div className="title-cell">
+                  <div className="title">{s.title}</div>
+                  <div className="artist">{s.artist}</div>
+                </div>
+                <div className="meta-cell">
+                  <span className="chip">{s.count}× this month</span>
+                </div>
+                <button
+                  className="action"
+                  title="Search on Spotify"
+                  onClick={() => window.open(`https://open.spotify.com/search/${encodeURIComponent(`${s.title} ${s.artist}`)}`, '_blank')}
+                >
+                  <Icon name="external" size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+    </div>
   );
 }
 

@@ -6,16 +6,26 @@ function getDigestTo() {
   return getDb().prepare('SELECT value FROM settings WHERE key = ?').get('digest_to')?.value || config.DIGEST_TO;
 }
 
+function getSmtpConfig() {
+  const db = getDb();
+  const dbGet = (key) => db.prepare('SELECT value FROM settings WHERE key = ?').get(key)?.value;
+  const port = parseInt(dbGet('smtp_port') || config.SMTP_PORT, 10);
+  return {
+    host: dbGet('smtp_host') || config.SMTP_HOST,
+    port,
+    user: dbGet('smtp_user') || config.SMTP_USER,
+    pass: dbGet('smtp_pass') || config.SMTP_PASS,
+  };
+}
+
 function createTransport() {
+  const { host, port, user, pass } = getSmtpConfig();
   return nodemailer.createTransport({
-    host: config.SMTP_HOST,
-    port: config.SMTP_PORT,
-    secure: config.SMTP_PORT === 465,  // true for SSL, false + requireTLS for STARTTLS (587)
-    requireTLS: config.SMTP_PORT !== 465,
-    auth: {
-      user: config.SMTP_USER,
-      pass: config.SMTP_PASS,
-    },
+    host,
+    port,
+    secure: port === 465,
+    requireTLS: port !== 465,
+    auth: { user, pass },
   });
 }
 

@@ -18,5 +18,5 @@ module.exports = {
   DIGEST_FROM: process.env.DIGEST_FROM || '',
   SEND_TIME:   process.env.SEND_TIME || '08:00',
   TIMEZONE:    process.env.TIMEZONE || 'America/New_York',
-  PORT:        parseInt(process.env.PORT || '3000', 10),
+  PORT: parseInt(process.env.PORT || '3000', 10),
 };

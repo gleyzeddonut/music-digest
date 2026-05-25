@@ -5,6 +5,7 @@ import { api } from './api.js';
 
 const SVG = {
   today:    <><rect x="2" y="3" width="12" height="12" rx="2" strokeWidth="1.3" stroke="currentColor" fill="none"/><path d="M8 7v4M6 9h4" strokeWidth="1.3" stroke="currentColor" strokeLinecap="round"/></>,
+  monthly:  <><rect x="2" y="3" width="12" height="12" rx="2" strokeWidth="1.3" stroke="currentColor" fill="none"/><path d="M5 3V1.5M11 3V1.5M2 6.5h12" strokeWidth="1.3" stroke="currentColor" strokeLinecap="round"/><circle cx="5.5" cy="10" r="1" fill="currentColor"/><circle cx="8" cy="10" r="1" fill="currentColor"/><circle cx="10.5" cy="10" r="1" fill="currentColor"/></>,
   history:  <><circle cx="8" cy="8" r="6.5" strokeWidth="1.3" stroke="currentColor" fill="none"/><path d="M8 5v3.5L10 10" strokeWidth="1.3" stroke="currentColor" strokeLinecap="round"/></>,
   sources:  <><path d="M3 5h10M3 8h7M3 11h9" strokeWidth="1.3" stroke="currentColor" strokeLinecap="round"/></>,
   settings: <><circle cx="8" cy="8" r="2.2" strokeWidth="1.3" stroke="currentColor" fill="none"/><path d="M8 1.5v1M8 13.5v1M1.5 8h1M13.5 8h1M3.4 3.4l.7.7M11.9 11.9l.7.7M3.4 12.6l.7-.7M11.9 4.1l.7-.7" strokeWidth="1.3" stroke="currentColor" strokeLinecap="round"/></>,
@@ -114,15 +115,15 @@ function Sidebar({ route, onNavigate, spotifyConnected }) {
 
       <div className="nav-group">
         <div className="nav-label">Daily</div>
-        <NavItem id="digest"  label="Today"   icon="today"   route={route} onNavigate={onNavigate} />
-        <NavItem id="history" label="Archive"  icon="history" route={route} onNavigate={onNavigate} />
+        <NavItem id="digest"  label="Today"      icon="today"    route={route} onNavigate={onNavigate} />
+        <NavItem id="monthly" label="This Month" icon="monthly"  route={route} onNavigate={onNavigate} />
+        <NavItem id="history" label="Archive"    icon="history"  route={route} onNavigate={onNavigate} />
         <NavItem id="sources" label="Sources"  icon="sources" route={route} onNavigate={onNavigate} />
       </div>
 
       <div className="nav-group">
         <div className="nav-label">Library</div>
         <NavItem id="playlist" label="Playlist" icon="playlist" route={route} onNavigate={onNavigate} />
-        <NavItem id="settings" label="Settings" icon="settings" route={route} onNavigate={onNavigate} />
       </div>
 
       <div className="sidebar-bottom">
@@ -219,7 +220,7 @@ function Topbar({ title, onRun, running, userName, userEmail, onNavigate, spotif
             {!spotifyConnected && (
               <>
                 <div className="am-sep" />
-                <button className="am-item" style={{ background: 'none', border: 'none', cursor: 'pointer', width: '100%', textAlign: 'left', padding: 0 }} onClick={() => { setOpen(false); onSpotifyConnect?.(); }}>
+                <button className="am-item" style={{ background: 'none', border: 'none', cursor: 'pointer', width: '100%', textAlign: 'left', padding: 0 }} onClick={() => { setMenuOpen(false); onSpotifyConnect?.(); }}>
                   <Icon name="spotify" size={14} />
                   <span>Connect Spotify</span>
                 </button>

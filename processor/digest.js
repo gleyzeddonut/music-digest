@@ -9,6 +9,7 @@ const { scrapeGenius } = require('../scraper/genius');
 const { scrapeKworbShazam, scrapeKworbSpotify } = require('../scraper/kworb');
 const { scrapeHypem } = require('../scraper/hypem');
 const { scrapeTokchart } = require('../scraper/tokchart');
+const { scrapeYoutube }  = require('../scraper/youtube');
 const { score, normalizeArtist, normalizeTrack } = require('./scorer');
 const { processWithClaude } = require('./claude');
 const { appendSongsToPlaylist } = require('./spotify');
@@ -40,12 +41,13 @@ async function runDigest(opts = {}) {
   const tiktokSources    = sources.filter(s => s.type === 'tiktok');
   const playlistSources  = sources.filter(s => s.type === 'spotify-playlist');
   const tokchartEnabled  = sources.some(s => s.type === 'tokchart');
+  const youtubeEnabled   = sources.some(s => s.type === 'youtube');
 
   console.log('[PHASE] Scraping');
   console.log(`[digest] ${redditSources.length} subreddits · ${webSources.length} web sources · ${tiktokSources.length} TikTok · ${playlistSources.length} Spotify playlists`);
 
   // 2. Scrape in parallel
-  const [redditData, webData, tiktokResult, playlistData, appleCharts, lastfmData, geniusTrending, shazamChart, spotifyChart, tokchartData, hypemData] = await Promise.all([
+  const [redditData, webData, tiktokResult, playlistData, appleCharts, lastfmData, geniusTrending, shazamChart, spotifyChart, tokchartData, hypemData, youtubeData] = await Promise.all([
     scrapeReddit(redditSources),
     scrapeWeb(webSources),
     scrapeTikTok(tiktokSources),
@@ -57,13 +59,14 @@ async function runDigest(opts = {}) {
     scrapeKworbSpotify(),
     tokchartEnabled ? scrapeTokchart().catch(e => { console.warn('[tokchart] failed:', e.message); return []; }) : [],
     scrapeHypem(),
+    youtubeEnabled  ? scrapeYoutube().catch(e => { console.warn('[youtube] failed:', e.message); return []; }) : [],
   ]);
 
   // tiktokResult splits into formatted (for Claude prompt) and raw (for scorer)
   const tiktokData    = tiktokResult.formatted;
   const tiktokRaw     = tiktokResult.raw;
 
-  console.log(`[digest] Shazam: ${shazamChart.length} · Spotify global: ${spotifyChart.length} · Hype Machine: ${hypemData.length} · TikTok: ${tiktokData.reduce((n,t)=>n+t.items.length,0)} · Tokchart: ${tokchartData.length}`);
+  console.log(`[digest] Shazam: ${shazamChart.length} · Spotify global: ${spotifyChart.length} · Hype Machine: ${hypemData.length} · TikTok: ${tiktokData.reduce((n,t)=>n+t.items.length,0)} · Tokchart: ${tokchartData.length} · YouTube: ${youtubeData.length}`);
 
   const totalItems = redditData.reduce((n, r) => n + r.posts.length, 0)
     + webData.reduce((n, w) => n + w.items.length, 0)
@@ -76,7 +79,7 @@ async function runDigest(opts = {}) {
   }
 
   console.log('[PHASE] Scoring');
-  const scoredData = score(redditData, webData, appleCharts, lastfmData.artists, geniusTrending, lastfmData.tracks, shazamChart, spotifyChart, hypemData, tiktokRaw);
+  const scoredData = score(redditData, webData, appleCharts, lastfmData.artists, geniusTrending, lastfmData.tracks, shazamChart, spotifyChart, hypemData, tiktokRaw, youtubeData);
 
   console.log('[PHASE] Claude');
   console.log(`[digest] Scraped ${totalItems} total items. Sending to Claude...`);
@@ -103,7 +106,7 @@ async function runDigest(opts = {}) {
   console.log(`[digest] Headlines resolved: ${matched}/${result.headlines.length} with URLs`);
 
   // Score songs against chart data and sort by signal strength
-  result.songs = scoreSongs(result.songs || [], lastfmData.tracks, geniusTrending, shazamChart, spotifyChart, appleCharts, tokchartData);
+  result.songs = scoreSongs(result.songs || [], lastfmData.tracks, geniusTrending, shazamChart, spotifyChart, appleCharts, tokchartData, youtubeData);
   console.log(`[digest] Song scores: ${result.songs.map(s => `${s.title}(${s.song_score.toFixed(2)})`).join(', ')}`);
 
   // Merge scorer sub-scores into Claude's artist output for UI badge rendering
@@ -140,8 +143,8 @@ async function runDigest(opts = {}) {
   // 6. Save to DB
   console.log('[PHASE] Saving');
   db.prepare(`
-    INSERT OR REPLACE INTO digests (date, summary, artists, songs, headlines, playlist_url)
-    VALUES (?, ?, ?, ?, ?, ?)
+    INSERT OR REPLACE INTO digests (date, summary, artists, songs, headlines, playlist_url, mentioned_artists)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
   `).run(
     date,
     result.summary,
@@ -149,6 +152,7 @@ async function runDigest(opts = {}) {
     JSON.stringify(result.songs || []),
     JSON.stringify(result.headlines || []),
     playlistUrl,
+    JSON.stringify(result.mentioned_artists || []),
   );
 
   console.log(`[digest] Saved digest for ${date}`);
@@ -183,12 +187,13 @@ function buildChartMap(tracks) {
   return map;
 }
 
-function scoreSongs(songs, lastfmTracks = [], geniusTrending = [], shazamChart = [], spotifyChart = [], appleCharts = [], tokchartData = []) {
+function scoreSongs(songs, lastfmTracks = [], geniusTrending = [], shazamChart = [], spotifyChart = [], appleCharts = [], tokchartData = [], youtubeData = []) {
   const lfmMap      = buildChartMap(lastfmTracks);
   const geniusMap   = buildChartMap(geniusTrending);
   const shazamMap   = buildChartMap(shazamChart);
   const spotifyMap  = buildChartMap(spotifyChart);
   const appleMap    = buildChartMap(appleCharts);
+  const youtubeMap  = buildChartMap(youtubeData);
   // Tokchart: normalise score (1–1000) to a rank-like index for map building
   const tokMap = new Map();
   for (const t of tokchartData) {
@@ -207,24 +212,26 @@ function scoreSongs(songs, lastfmTracks = [], geniusTrending = [], shazamChart =
     const shazamRank  = shazamMap.get(fullKey)  ?? shazamMap.get(titleNorm)  ?? null;
     const spotifyRank = spotifyMap.get(fullKey) ?? spotifyMap.get(titleNorm) ?? null;
     const appleRank   = appleMap.get(fullKey)   ?? appleMap.get(titleNorm)   ?? null;
-    const tokScore    = tokMap.get(fullKey)      ?? tokMap.get(titleNorm)     ?? null;
+    const youtubeRank = youtubeMap.get(fullKey) ?? youtubeMap.get(titleNorm) ?? null;
+    const tokScore    = tokMap.get(fullKey)     ?? tokMap.get(titleNorm)     ?? null;
     const sourceCount = s.sources?.length || 0;
 
-    // Shazam weighted highest (leading indicator); Apple added as mainstream confirmation
+    // Shazam weighted highest (leading indicator); Apple/YouTube for mainstream confirmation
     let song_score = 0;
-    if (shazamRank)  song_score += 0.30 * (1 - (shazamRank  - 1) / 49);
-    if (geniusRank)  song_score += 0.22 * (1 - (geniusRank  - 1) / 49);
-    if (lfmRank)     song_score += 0.18 * (1 - (lfmRank      - 1) / 49);
-    if (appleRank)   song_score += 0.15 * (1 - (appleRank    - 1) / 99);
-    if (spotifyRank) song_score += 0.10 * (1 - (spotifyRank  - 1) / 199);
-    if (tokScore)    song_score += 0.12 * (tokScore / 1000);  // score 1–1000 normalised
+    if (shazamRank)   song_score += 0.28 * (1 - (shazamRank  - 1) / 49);
+    if (geniusRank)   song_score += 0.20 * (1 - (geniusRank  - 1) / 49);
+    if (lfmRank)      song_score += 0.17 * (1 - (lfmRank      - 1) / 49);
+    if (appleRank)    song_score += 0.13 * (1 - (appleRank    - 1) / 99);
+    if (spotifyRank)  song_score += 0.09 * (1 - (spotifyRank  - 1) / 199);
+    if (youtubeRank)  song_score += 0.11 * (1 - (youtubeRank  - 1) / 49);
+    if (tokScore)     song_score += 0.12 * (tokScore / 1000);
     song_score += Math.min(0.05, sourceCount * 0.02);
 
     return {
       ...s,
       lfm_rank: lfmRank, genius_rank: geniusRank,
       shazam_rank: shazamRank, spotify_rank: spotifyRank, apple_rank: appleRank,
-      tokchart_score: tokScore,
+      youtube_rank: youtubeRank, tokchart_score: tokScore,
       song_score: Math.round(song_score * 100) / 100,
     };
   }).sort((a, b) => b.song_score - a.song_score);

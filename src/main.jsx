@@ -8,7 +8,9 @@ import {
   SourcesScreen,
   SettingsScreen,
   ArtistScreen,
+  BriefScreen,
   PlaylistScreen,
+  MonthlyScreen,
   Onboarding,
   LoadingShell,
 } from './screens.jsx';
@@ -83,8 +85,37 @@ function adaptDigest(digest, list, status) {
     brief: (digest.summary || digest.brief || '')
       .split(/\n\n+/)
       .map(p => p.trim())
-      .filter(Boolean),
+      .filter(Boolean)
+      .flatMap(p => {
+        // If the block is all bullet lines, split each into its own entry
+        const lines = p.split('\n').map(l => l.trim()).filter(Boolean);
+        if (lines.length > 1 && lines.every(l => l.startsWith('•'))) {
+          return [lines.join('\n')]; // keep as one block for list rendering
+        }
+        return [p];
+      }),
     briefPulls,
+    briefArtistNames: (() => {
+      // Prefer Claude's explicit mentioned_artists list (present in digests run after this update).
+      // Fall back to featured artists + song artists for older digests.
+      const base = (digest.mentioned_artists || []).length > 0
+        ? (digest.mentioned_artists || [])
+        : [
+            ...(digest.artists || []).map(a => a.name),
+            ...(digest.songs || []).map(s => s.artist),
+          ];
+      return base.filter((n, i, arr) => n && arr.findIndex(x => x?.toLowerCase() === n.toLowerCase()) === i);
+    })(),
+    briefArtistSpotifyUrls: (() => {
+      const base = (digest.mentioned_artists || []).length > 0
+        ? (digest.mentioned_artists || [])
+        : [
+            ...(digest.artists || []).map(a => a.name),
+            ...(digest.songs || []).map(s => s.artist),
+          ];
+      const names = base.filter((n, i, arr) => n && arr.findIndex(x => x?.toLowerCase() === n.toLowerCase()) === i);
+      return Object.fromEntries(names.map(n => [n.toLowerCase(), `https://open.spotify.com/search/${encodeURIComponent(n)}`]));
+    })(),
     artists: (digest.artists || []).slice(0, 4).map(a => ({
       ...a,
       initials: (a.name || '').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase(),
@@ -146,6 +177,7 @@ function App() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [selectedArtist, setSelectedArtist] = useState(null);
   const [showLog, setShowLog] = useState(false);
+  const [monthlyData, setMonthlyData] = useState(null);
 
   // ── Initial load ────────────────────────────────────────────────────────────
 
@@ -235,6 +267,12 @@ function App() {
   const navigate = useCallback((newRoute) => {
     setSelectedArtist(null);
     setRoute(newRoute);
+    if (newRoute === 'monthly') {
+      const now = new Date();
+      api.monthly(now.getFullYear(), now.getMonth() + 1)
+        .then(setMonthlyData)
+        .catch(() => {});
+    }
   }, []);
 
   // Global keyboard shortcuts — placed after navigate is defined
@@ -302,6 +340,9 @@ function App() {
 
   let screen;
   switch (route) {
+    case 'monthly':
+      screen = <MonthlyScreen data={monthlyData} />;
+      break;
     case 'history':
       screen = <HistoryScreen onViewDigest={handleViewDigest} />;
       break;
@@ -324,6 +365,15 @@ function App() {
         />
       );
       break;
+    case 'brief':
+      screen = (
+        <BriefScreen
+          data={data}
+          onBack={() => navigate('digest')}
+          onArtistClick={handleArtistClick}
+        />
+      );
+      break;
     case 'playlist':
       screen = <PlaylistScreen status={rawStatus} />;
       break;
@@ -334,6 +384,7 @@ function App() {
           data={data}
           onArtistClick={handleArtistClick}
           onSongPlay={handleSongPlay}
+          onReadBrief={() => navigate('brief')}
           running={running}
         />
       ) : (
@@ -356,6 +407,7 @@ function App() {
     route === 'sources'  ? 'Sources'  :
     route === 'settings' ? 'Settings' :
     route === 'playlist' ? 'Playlist' :
+    route === 'brief'    ? 'The Brief' :
     route === 'artist'   ? (selectedArtist?.name || 'Artist') :
     data?.issue?.date    ? `${data.issue.date} · Issue #${data.issue.number}` : 'Music Digest';
 

@@ -66,7 +66,7 @@ function extractArtistFromTitle(title) {
 }
 
 // ── Build unified mention map ────────────────────────────────────────────────
-function buildMentionMap(redditData, webData, appleCharts, lastfmArtists, geniusTrending, lastfmBaselines, lastfmTracks, shazamChart, spotifyChart, hypemData, tiktokChart) {
+function buildMentionMap(redditData, webData, appleCharts, lastfmArtists, geniusTrending, lastfmBaselines, lastfmTracks, shazamChart, spotifyChart, hypemData, tiktokChart, youtubeData = []) {
   const map = new Map(); // normalizedName → entity object
 
   function getOrCreate(rawName) {
@@ -146,6 +146,15 @@ function buildMentionMap(redditData, webData, appleCharts, lastfmArtists, genius
     if (e) {
       const prev = e.chartPositions.tiktok;
       if (prev == null || rank < prev) e.chartPositions.tiktok = rank;
+    }
+  }
+
+  // YouTube Trending Music — mainstream video consumption signal
+  for (const { artist, rank } of (youtubeData || [])) {
+    const e = getOrCreate(artist);
+    if (e) {
+      const prev = e.chartPositions.youtube;
+      if (prev == null || rank < prev) e.chartPositions.youtube = rank;
     }
   }
 
@@ -299,14 +308,14 @@ function updateBaselines(lastfmArtists) {
 }
 
 // ── Main entry point ─────────────────────────────────────────────────────────
-function score(redditData, webData, appleCharts, lastfmArtists, geniusTrending, lastfmTracks = [], shazamChart = [], spotifyChart = [], hypemData = [], tiktokChart = []) {
+function score(redditData, webData, appleCharts, lastfmArtists, geniusTrending, lastfmTracks = [], shazamChart = [], spotifyChart = [], hypemData = [], tiktokChart = [], youtubeData = []) {
   const db = getDb();
   const rows = db.prepare('SELECT artist_name, listeners FROM artist_baselines').all();
   const lastfmBaselines = Object.fromEntries(rows.map(r => [r.artist_name, r.listeners]));
 
   const mentionMap = buildMentionMap(
     redditData, webData, appleCharts, lastfmArtists, geniusTrending, lastfmBaselines, lastfmTracks,
-    shazamChart, spotifyChart, hypemData, tiktokChart
+    shazamChart, spotifyChart, hypemData, tiktokChart, youtubeData
   );
 
   const scored = [];

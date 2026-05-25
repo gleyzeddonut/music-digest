@@ -133,7 +133,8 @@ Respond with valid JSON only, no markdown, no explanation:
   "songs": [
     {"title": "string", "artist": "string", "tier": "breaking|rising", "reason": "why this track is getting attention", "sources": ["source name 1", "source name 2"]}
   ],
-  "headline_indices": [0, 4, 7]
+  "headline_indices": [0, 4, 7],
+  "mentioned_artists": ["every musician or band name you mention anywhere in the summary — musicians and bands only, never actors, journalists, hosts, or other non-music figures"]
 }`;
 
   let response;

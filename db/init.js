@@ -47,39 +47,49 @@ const DEFAULT_SOURCES = [
   // Spotify Viral 50 playlist discontinued by Spotify in 2023 — removed
   // Scrapers with fixed URLs (no user config needed)
   { type: 'tiktok',   name: 'TikTok Charts', url: 'https://kworb.net/charts/tiktok/us.html' },
-  { type: 'tokchart', name: 'Tokchart',       url: 'https://tokchart.com' },
+  { type: 'tokchart', name: 'Tokchart',           url: 'https://tokchart.com' },
+  { type: 'youtube',  name: 'YouTube Trending',   url: 'https://charts.youtube.com/charts/TrendingVideos/us/RightNow' },
 ];
 
 function initDb() {
   const db = getDb();
 
-  const NEW_TYPES = "'reddit','rss','html','tiktok','spotify-playlist','tokchart'";
+  const NEW_TYPES = "'reddit','rss','html','tiktok','spotify-playlist','tokchart','youtube'";
 
   // Migration: extend sources type constraint whenever a new type is added
   const tableInfo = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='sources'").get();
   const needsMigration = tableInfo && (
-    !tableInfo.sql.includes("'tiktok'") || !tableInfo.sql.includes("'spotify-playlist'") || !tableInfo.sql.includes("'tokchart'")
+    !tableInfo.sql.includes("'tiktok'") || !tableInfo.sql.includes("'spotify-playlist'") || !tableInfo.sql.includes("'tokchart'") || !tableInfo.sql.includes("'youtube'")
   );
   if (needsMigration) {
-    db.exec(`ALTER TABLE sources RENAME TO _sources_old`);
-    db.exec(`CREATE TABLE sources (
-      id        INTEGER PRIMARY KEY AUTOINCREMENT,
-      type      TEXT NOT NULL CHECK(type IN (${NEW_TYPES})),
-      name      TEXT NOT NULL,
-      url       TEXT NOT NULL,
-      selector  TEXT,
-      enabled   INTEGER NOT NULL DEFAULT 1,
-      added_at  TEXT NOT NULL DEFAULT (datetime('now'))
-    )`);
-    db.exec(`INSERT INTO sources SELECT * FROM _sources_old`);
-    db.exec(`DROP TABLE _sources_old`);
+    db.transaction(() => {
+      db.exec(`ALTER TABLE sources RENAME TO _sources_old`);
+      db.exec(`CREATE TABLE sources (
+        id        INTEGER PRIMARY KEY AUTOINCREMENT,
+        type      TEXT NOT NULL CHECK(type IN (${NEW_TYPES})),
+        name      TEXT NOT NULL,
+        url       TEXT NOT NULL,
+        selector  TEXT,
+        enabled   INTEGER NOT NULL DEFAULT 1,
+        added_at  TEXT NOT NULL DEFAULT (datetime('now'))
+      )`);
+      db.exec(`INSERT INTO sources SELECT * FROM _sources_old`);
+      db.exec(`DROP TABLE _sources_old`);
+    })();
     console.log('[db] Migrated sources: updated type constraint');
+  }
+
+  // Migration: add mentioned_artists column to digests if missing
+  const digestsInfo = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='digests'").get();
+  if (digestsInfo && !digestsInfo.sql.includes('mentioned_artists')) {
+    db.exec('ALTER TABLE digests ADD COLUMN mentioned_artists TEXT');
+    console.log('[db] Migrated digests: added mentioned_artists column');
   }
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS sources (
       id        INTEGER PRIMARY KEY AUTOINCREMENT,
-      type      TEXT NOT NULL CHECK(type IN ('reddit','rss','html','tiktok','spotify-playlist','tokchart')),
+      type      TEXT NOT NULL CHECK(type IN ('reddit','rss','html','tiktok','spotify-playlist','tokchart','youtube')),
       name      TEXT NOT NULL,
       url       TEXT NOT NULL,
       selector  TEXT,
