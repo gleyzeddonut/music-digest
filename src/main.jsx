@@ -271,7 +271,7 @@ function App() {
       const now = new Date();
       api.monthly(now.getFullYear(), now.getMonth() + 1)
         .then(setMonthlyData)
-        .catch(() => {});
+        .catch(() => setMonthlyData({ error: true }));
     }
   }, []);
 

@@ -134,7 +134,8 @@ function escHtml(str) {
 }
 
 async function sendDigestEmail(date, result, playlistUrl, added = [], unmatched = []) {
-  if (!config.SMTP_USER || !config.SMTP_PASS) {
+  const smtp = getSmtpConfig();
+  if (!smtp.user || !smtp.pass) {
     console.warn('[email] SMTP credentials not set — skipping email');
     return false;
   }
@@ -148,7 +149,7 @@ async function sendDigestEmail(date, result, playlistUrl, added = [], unmatched 
   try {
     const transport = createTransport();
     await transport.sendMail({
-      from: config.DIGEST_FROM,
+      from: config.DIGEST_FROM || smtp.user,
       to: getDigestTo(),
       subject,
       html,
@@ -162,7 +163,8 @@ async function sendDigestEmail(date, result, playlistUrl, added = [], unmatched 
 }
 
 async function verifySmtp() {
-  if (!config.SMTP_USER || !config.SMTP_PASS) return;
+  const smtp = getSmtpConfig();
+  if (!smtp.user || !smtp.pass) return;
   try {
     await createTransport().verify();
     console.log(`[email] SMTP ready — ${config.SMTP_USER}`);

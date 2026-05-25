@@ -1016,7 +1016,7 @@ export function PlaylistScreen({ status }) {
 
 export function Onboarding({ onDone }) {
   const [step, setStep] = React.useState(0);
-  const STEPS = ['Welcome', 'Spotify', 'Sources', 'Schedule', 'Done'];
+  const STEPS = ['Welcome', 'Spotify', 'Sources', 'Schedule', 'Email', 'Done'];
 
 
   const next = () => {
@@ -1055,13 +1055,14 @@ export function Onboarding({ onDone }) {
         {step === 1 && <StepSpotify onConnected={next} />}
         {step === 2 && <StepSources />}
         {step === 3 && <StepSchedule onDone={next} />}
-        {step === 4 && <StepDone onDone={onDone} />}
+        {step === 4 && <StepEmail onDone={next} />}
+        {step === 5 && <StepDone onDone={onDone} />}
 
-        {step < 4 && (
+        {step < 5 && (
           <div className="ob-foot">
             {step > 0 && <button className="ob-back" onClick={back}>← Back</button>}
             <button className="ob-skip" onClick={onDone}>Skip setup</button>
-            {step !== 3 && (
+            {step !== 3 && step !== 4 && (
               <button className="ob-next" onClick={next}>
                 {step === STEPS.length - 2 ? 'Finish' : 'Continue →'}
               </button>
@@ -1195,6 +1196,63 @@ function StepSchedule({ onDone }) {
   );
 }
 
+function StepEmail({ onDone }) {
+  const [user, setUser] = React.useState('');
+  const [pass, setPass] = React.useState('');
+  const [saving, setSaving] = React.useState(false);
+  const [err, setErr] = React.useState('');
+
+  async function save() {
+    if (!user.trim() || !pass.trim()) { setErr('Both fields are required.'); return; }
+    setSaving(true);
+    try {
+      await api.saveSmtp(user.trim(), pass.trim());
+      onDone();
+    } catch (e) {
+      setErr('Could not save — check your credentials and try again.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <>
+      <h2 className="ob-title">Set up email delivery</h2>
+      <p className="ob-desc">
+        Music Digest sends your digest via your own email account — nothing is stored on our servers.
+        Use a Gmail or Yahoo <strong>app password</strong> (not your main password).
+      </p>
+      <div className="ob-field">
+        <label className="ob-label">Email address</label>
+        <input
+          className="ob-input"
+          type="email"
+          placeholder="you@gmail.com"
+          value={user}
+          onChange={e => { setUser(e.target.value); setErr(''); }}
+        />
+      </div>
+      <div className="ob-field" style={{ marginTop: 12 }}>
+        <label className="ob-label">App password</label>
+        <input
+          className="ob-input"
+          type="password"
+          placeholder="xxxx xxxx xxxx xxxx"
+          value={pass}
+          onChange={e => { setPass(e.target.value); setErr(''); }}
+        />
+      </div>
+      {err && <p style={{ color: 'var(--err, #e55)', fontSize: 13, marginTop: 8 }}>{err}</p>}
+      <div className="ob-foot" style={{ paddingTop: 0, marginTop: 20 }}>
+        <button className="ob-skip" onClick={onDone}>Skip for now →</button>
+        <button className="ob-next" onClick={save} disabled={saving}>
+          {saving ? 'Saving…' : 'Save & continue →'}
+        </button>
+      </div>
+    </>
+  );
+}
+
 function StepDone({ onDone }) {
   return (
     <>
@@ -1214,6 +1272,15 @@ export function MonthlyScreen({ data }) {
     return (
       <div style={{ padding: '48px var(--content-pad)', color: 'var(--muted)', fontFamily: 'var(--f-mono)', fontSize: 13 }}>
         Loading monthly recap…
+      </div>
+    );
+  }
+
+  if (data.error) {
+    return (
+      <div style={{ padding: '48px var(--content-pad)' }}>
+        <div style={{ color: 'var(--text)', fontSize: 15, marginBottom: 8 }}>Couldn't load monthly recap.</div>
+        <div style={{ color: 'var(--muted)', fontFamily: 'var(--f-mono)', fontSize: 12 }}>Click "This Month" in the sidebar to try again.</div>
       </div>
     );
   }

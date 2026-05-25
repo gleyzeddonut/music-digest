@@ -98,14 +98,15 @@ function initDb() {
     );
 
     CREATE TABLE IF NOT EXISTS digests (
-      id           INTEGER PRIMARY KEY AUTOINCREMENT,
-      date         TEXT UNIQUE NOT NULL,
-      summary      TEXT,
-      artists      TEXT,
-      songs        TEXT,
-      headlines    TEXT,
-      playlist_url TEXT,
-      created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+      id                INTEGER PRIMARY KEY AUTOINCREMENT,
+      date              TEXT UNIQUE NOT NULL,
+      summary           TEXT,
+      artists           TEXT,
+      songs             TEXT,
+      headlines         TEXT,
+      playlist_url      TEXT,
+      mentioned_artists TEXT,
+      created_at        TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
     CREATE TABLE IF NOT EXISTS playlist_tracks (
