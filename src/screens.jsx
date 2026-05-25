@@ -1036,7 +1036,7 @@ export function Onboarding({ onDone }) {
             <button className="ob-skip" onClick={onDone}>Skip setup</button>
             {step !== 3 && (
               <button className="ob-next" onClick={next}>
-                {step === STEPS.length - 2 ? 'Finish' : 'Continue →'}
+                {'Continue →'}
               </button>
             )}
           </div>

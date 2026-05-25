@@ -25,15 +25,18 @@ Deno.serve(async (req) => {
       password: Deno.env.get('SMTP_PASS') ?? '',
     })
 
-    await client.send({
-      from: Deno.env.get('SMTP_FROM') ?? Deno.env.get('SMTP_USER') ?? '',
-      to,
-      subject,
-      content: 'This digest requires an HTML-capable email client.',
-      html,
-    })
+    try {
+      await client.send({
+        from: Deno.env.get('SMTP_FROM') ?? Deno.env.get('SMTP_USER') ?? '',
+        to,
+        subject,
+        content: 'This digest requires an HTML-capable email client.',
+        html,
+      })
+    } finally {
+      await client.close().catch(() => {})
+    }
 
-    await client.close()
     return new Response(JSON.stringify({ ok: true }), {
       headers: { ...CORS, 'Content-Type': 'application/json' },
     })

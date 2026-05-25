@@ -185,15 +185,12 @@ router.get('/api/digests/:date', (req, res) => {
 });
 
 router.post('/api/digests/:date/resend', async (req, res) => {
-  const config = require('../config');
   const db = getDb();
-  const smtpUser = db.prepare("SELECT value FROM settings WHERE key = 'smtp_user'").get()?.value || config.SMTP_USER;
-  const smtpPass = db.prepare("SELECT value FROM settings WHERE key = 'smtp_pass'").get()?.value || config.SMTP_PASS;
-  if (!smtpUser || !smtpPass) {
-    return res.status(400).json({ error: 'Email not configured — add SMTP credentials in Settings → Delivery' });
-  }
   const row = db.prepare('SELECT * FROM digests WHERE date = ?').get(req.params.date);
   if (!row) return res.status(404).json({ error: 'Digest not found' });
+
+  const to = db.prepare("SELECT value FROM settings WHERE key = 'digest_to'").get()?.value;
+  if (!to) return res.status(400).json({ error: 'No recipient email configured — set one in Settings → Delivery' });
 
   const result = parseDigest(row);
   const added = db.prepare(
@@ -204,7 +201,7 @@ router.post('/api/digests/:date/resend', async (req, res) => {
 
   try {
     const sent = await sendDigestEmail(req.params.date, result, row.playlist_url, added, unmatched);
-    res.json({ ok: sent, error: sent ? null : 'Send failed — check SMTP settings' });
+    res.json({ ok: sent, error: sent ? null : 'Send failed — check your recipient email in Settings' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -364,8 +361,6 @@ router.get('/api/settings', (req, res) => {
   const dbSettings = Object.fromEntries(rows.map(r => [r.key, r.value]));
   const config = require('../config');
   const db_get = (key, fallback) => { const v = dbSettings[key]; return v != null ? v : fallback; };
-  const smtpUser = db_get('smtp_user', '') || config.SMTP_USER;
-  const smtpConfigured = !!(smtpUser && (db_get('smtp_pass', '') || config.SMTP_PASS));
   res.json({
     email:           db_get('digest_to',            config.DIGEST_TO),
     sendTime:        db_get('schedule_send_time',   config.SEND_TIME),
@@ -375,25 +370,12 @@ router.get('/api/settings', (req, res) => {
     scheduleEnabled: db_get('schedule_enabled', '1') !== '0',
     userName:        db_get('user_name', ''),
     timezone:        config.TIMEZONE,
-    smtpUser,
-    smtpConfigured,
     spotify: {
       connected: isConnected(),
       playlistUrl: getPlaylistUrl(),
       playlistName: db_get('spotify_playlist_name', '🎵 Music Digest'),
     },
   });
-});
-
-router.post('/api/settings/smtp', (req, res) => {
-  const { user, pass } = req.body;
-  if (!user?.trim()) return res.status(400).json({ error: 'SMTP user required' });
-  const db = getDb();
-  db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('smtp_user', user.trim());
-  if (pass?.trim()) {
-    db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('smtp_pass', pass.trim());
-  }
-  res.json({ ok: true });
 });
 
 router.post('/api/settings/spotify-playlist-name', (req, res) => {
