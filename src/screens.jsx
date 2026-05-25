@@ -324,7 +324,7 @@ export function HistoryScreen({ onViewDigest }) {
           <div className="section-eyebrow">Archive</div>
           <h2 className="section-title">History</h2>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginLeft: 'auto' }}>
           {selecting ? (
             <>
               <button className="btn-ghost" style={{ fontSize: 13, padding: '6px 14px' }} onClick={cancelSelect}>
@@ -340,12 +340,9 @@ export function HistoryScreen({ onViewDigest }) {
               </button>
             </>
           ) : (
-            <>
-              <span className="section-sub">{digests.length} digest{digests.length !== 1 ? 's' : ''}</span>
-              <button className="btn-ghost" style={{ fontSize: 13, padding: '6px 14px' }} onClick={() => setSelecting(true)}>
-                Select
-              </button>
-            </>
+            <button className="btn-ghost" style={{ fontSize: 13, padding: '6px 14px' }} onClick={() => setSelecting(true)}>
+              Delete archives
+            </button>
           )}
         </div>
       </div>
