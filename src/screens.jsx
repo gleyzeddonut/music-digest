@@ -632,33 +632,6 @@ export function SettingsScreen({ onSpotifyConnect }) {
               style={{ ...inputStyle, width: 160 }}
             />
           </SettingRow>
-          <SettingRow label="SMTP sender">
-            <input
-              type="email"
-              value={settings.smtpUser || ''}
-              onChange={e => setSettings(s => ({ ...s, smtpUser: e.target.value }))}
-              onBlur={e => {
-                const u = e.target.value.trim();
-                if (u) api.saveSmtp(u, '').catch(() => showToast('Failed to save SMTP user'));
-              }}
-              placeholder="you@gmail.com"
-              style={{ ...inputStyle, width: 220 }}
-            />
-          </SettingRow>
-          <SettingRow label="SMTP password">
-            <input
-              type="password"
-              defaultValue=""
-              onBlur={e => {
-                const p = e.target.value.trim();
-                if (p) api.saveSmtp(settings.smtpUser || '', p)
-                  .then(() => showToast('SMTP password saved'))
-                  .catch(() => showToast('Failed to save SMTP password'));
-              }}
-              placeholder={settings.smtpConfigured ? '••••••••' : 'Gmail app password'}
-              style={{ ...inputStyle, width: 220 }}
-            />
-          </SettingRow>
           <SettingRow label="Resend latest">
             <button onClick={resend} style={{ ...inputStyle, cursor: 'pointer', color: 'var(--text-2)' }}>
               ↩ Resend email
@@ -1016,7 +989,7 @@ export function PlaylistScreen({ status }) {
 
 export function Onboarding({ onDone }) {
   const [step, setStep] = React.useState(0);
-  const STEPS = ['Welcome', 'Spotify', 'Sources', 'Schedule', 'Email', 'Done'];
+  const STEPS = ['Welcome', 'Spotify', 'Sources', 'Schedule', 'Done'];
 
 
   const next = () => {
@@ -1055,14 +1028,13 @@ export function Onboarding({ onDone }) {
         {step === 1 && <StepSpotify onConnected={next} />}
         {step === 2 && <StepSources />}
         {step === 3 && <StepSchedule onDone={next} />}
-        {step === 4 && <StepEmail onDone={next} />}
-        {step === 5 && <StepDone onDone={onDone} />}
+        {step === 4 && <StepDone onDone={onDone} />}
 
-        {step < 5 && (
+        {step < 4 && (
           <div className="ob-foot">
             {step > 0 && <button className="ob-back" onClick={back}>← Back</button>}
             <button className="ob-skip" onClick={onDone}>Skip setup</button>
-            {step !== 3 && step !== 4 && (
+            {step !== 3 && (
               <button className="ob-next" onClick={next}>
                 {step === STEPS.length - 2 ? 'Finish' : 'Continue →'}
               </button>
@@ -1191,63 +1163,6 @@ function StepSchedule({ onDone }) {
       </div>
       <div className="ob-foot" style={{ paddingTop: 0, marginTop: 0 }}>
         <button className="ob-next" onClick={save}>Save &amp; continue →</button>
-      </div>
-    </>
-  );
-}
-
-function StepEmail({ onDone }) {
-  const [user, setUser] = React.useState('');
-  const [pass, setPass] = React.useState('');
-  const [saving, setSaving] = React.useState(false);
-  const [err, setErr] = React.useState('');
-
-  async function save() {
-    if (!user.trim() || !pass.trim()) { setErr('Both fields are required.'); return; }
-    setSaving(true);
-    try {
-      await api.saveSmtp(user.trim(), pass.trim());
-      onDone();
-    } catch (e) {
-      setErr('Could not save — check your credentials and try again.');
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <>
-      <h2 className="ob-title">Set up email delivery</h2>
-      <p className="ob-desc">
-        Music Digest sends your digest via your own email account — nothing is stored on our servers.
-        Use a Gmail or Yahoo <strong>app password</strong> (not your main password).
-      </p>
-      <div className="ob-field">
-        <label className="ob-label">Email address</label>
-        <input
-          className="ob-input"
-          type="email"
-          placeholder="you@gmail.com"
-          value={user}
-          onChange={e => { setUser(e.target.value); setErr(''); }}
-        />
-      </div>
-      <div className="ob-field" style={{ marginTop: 12 }}>
-        <label className="ob-label">App password</label>
-        <input
-          className="ob-input"
-          type="password"
-          placeholder="xxxx xxxx xxxx xxxx"
-          value={pass}
-          onChange={e => { setPass(e.target.value); setErr(''); }}
-        />
-      </div>
-      {err && <p style={{ color: 'var(--err, #e55)', fontSize: 13, marginTop: 8 }}>{err}</p>}
-      <div className="ob-foot" style={{ paddingTop: 0, marginTop: 20 }}>
-        <button className="ob-skip" onClick={onDone}>Skip for now →</button>
-        <button className="ob-next" onClick={save} disabled={saving}>
-          {saving ? 'Saving…' : 'Save & continue →'}
-        </button>
       </div>
     </>
   );

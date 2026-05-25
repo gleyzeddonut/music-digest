@@ -1,6 +1,7 @@
 const nodemailer = require('nodemailer');
 const config = require('../config');
 const { getDb } = require('../db/init');
+const { url: supabaseUrl, anonKey } = require('../supabase-client');
 
 function getDigestTo() {
   return getDb().prepare('SELECT value FROM settings WHERE key = ?').get('digest_to')?.value || config.DIGEST_TO;
@@ -133,28 +134,58 @@ function escHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
+async function sendViaSupabase(to, subject, html) {
+  const res = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${anonKey}`,
+      'apikey': anonKey,
+    },
+    body: JSON.stringify({ to, subject, html }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`Supabase send-email ${res.status}: ${body}`);
+  }
+}
+
 async function sendDigestEmail(date, result, playlistUrl, added = [], unmatched = []) {
-  const smtp = getSmtpConfig();
-  if (!smtp.user || !smtp.pass) {
-    console.warn('[email] SMTP credentials not set — skipping email');
+  const to = getDigestTo();
+  if (!to) {
+    console.warn('[email] No recipient configured — skipping email');
     return false;
   }
 
   const artistNames = (result.artists || []).slice(0, 3).map(a => a.name).join(', ');
   const extra = (result.artists?.length || 0) > 3 ? ` + ${result.artists.length - 3} more` : '';
   const subject = `Music Digest — ${formatDate(date)}${artistNames ? `: ${artistNames}${extra}` : ''}`;
-
   const html = buildHtml(date, result, playlistUrl, added, unmatched);
 
+  // Try centralized Supabase sender first (production path)
+  try {
+    await sendViaSupabase(to, subject, html);
+    console.log(`[email] Digest sent to ${to} via Supabase`);
+    return true;
+  } catch (err) {
+    console.warn('[email] Supabase send failed, trying local SMTP:', err.message);
+  }
+
+  // Fall back to local SMTP (dev / self-hosted path)
+  const smtp = getSmtpConfig();
+  if (!smtp.user || !smtp.pass) {
+    console.warn('[email] No local SMTP credentials — email not sent');
+    return false;
+  }
   try {
     const transport = createTransport();
     await transport.sendMail({
       from: config.DIGEST_FROM || smtp.user,
-      to: getDigestTo(),
+      to,
       subject,
       html,
     });
-    console.log(`[email] Digest sent to ${getDigestTo()}`);
+    console.log(`[email] Digest sent to ${to} via local SMTP`);
     return true;
   } catch (err) {
     console.error('[email] Failed to send:', err.message, err.code || '', err.response || '');

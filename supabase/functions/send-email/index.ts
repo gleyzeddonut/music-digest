@@ -20,13 +20,13 @@ Deno.serve(async (req) => {
     const client = new SmtpClient()
     await client.connectTLS({
       hostname: Deno.env.get('SMTP_HOST') ?? 'smtp.gmail.com',
-      port: Number(Deno.env.get('SMTP_PORT') ?? 587),
+      port: Number(Deno.env.get('SMTP_PORT') ?? 465),
       username: Deno.env.get('SMTP_USER') ?? '',
       password: Deno.env.get('SMTP_PASS') ?? '',
     })
 
     await client.send({
-      from: Deno.env.get('SMTP_FROM') ?? '',
+      from: Deno.env.get('SMTP_FROM') ?? Deno.env.get('SMTP_USER') ?? '',
       to,
       subject,
       content: 'This digest requires an HTML-capable email client.',
