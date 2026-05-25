@@ -258,13 +258,51 @@ export function DigestScreen({ data, onArtistClick, onSongPlay, onReadBrief, run
 export function HistoryScreen({ onViewDigest }) {
   const [digests, setDigests] = React.useState(null);
   const [loading, setLoading] = React.useState(true);
+  const [selecting, setSelecting] = React.useState(false);
+  const [selected, setSelected] = React.useState(new Set());
+  const [deleting, setDeleting] = React.useState(false);
 
-  React.useEffect(() => {
+  const load = React.useCallback(() => {
     api.digestList().then(res => {
       setDigests(res.digests || []);
       setLoading(false);
     }).catch(() => setLoading(false));
   }, []);
+
+  React.useEffect(() => { load(); }, [load]);
+
+  const allSelected = digests?.length > 0 && selected.size === digests.length;
+
+  const toggleAll = () => {
+    setSelected(allSelected ? new Set() : new Set(digests.map(d => d.date)));
+  };
+
+  const toggleOne = (date) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      next.has(date) ? next.delete(date) : next.add(date);
+      return next;
+    });
+  };
+
+  const cancelSelect = () => { setSelecting(false); setSelected(new Set()); };
+
+  const handleDelete = async () => {
+    if (selected.size === 0 || deleting) return;
+    setDeleting(true);
+    try {
+      await api.deleteDigests([...selected]);
+      const n = selected.size;
+      setSelected(new Set());
+      setSelecting(false);
+      load();
+      showToast(`Deleted ${n} digest${n !== 1 ? 's' : ''}`);
+    } catch {
+      showToast('Delete failed');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   if (loading) return <LoadingShell />;
 
@@ -286,9 +324,46 @@ export function HistoryScreen({ onViewDigest }) {
           <div className="section-eyebrow">Archive</div>
           <h2 className="section-title">History</h2>
         </div>
-        <span className="section-sub">{digests.length} digest{digests.length !== 1 ? 's' : ''}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {selecting ? (
+            <>
+              <button className="btn-ghost" style={{ fontSize: 13, padding: '6px 14px' }} onClick={cancelSelect}>
+                Cancel
+              </button>
+              <button
+                className="btn-ghost"
+                style={{ fontSize: 13, padding: '6px 14px', color: selected.size > 0 ? '#e55' : 'var(--muted)', borderColor: selected.size > 0 ? 'rgba(230,80,80,0.3)' : undefined, opacity: selected.size === 0 ? 0.5 : 1 }}
+                onClick={handleDelete}
+                disabled={selected.size === 0 || deleting}
+              >
+                {deleting ? 'Deleting…' : `Delete${selected.size > 0 ? ` (${selected.size})` : ''}`}
+              </button>
+            </>
+          ) : (
+            <>
+              <span className="section-sub">{digests.length} digest{digests.length !== 1 ? 's' : ''}</span>
+              <button className="btn-ghost" style={{ fontSize: 13, padding: '6px 14px' }} onClick={() => setSelecting(true)}>
+                Select
+              </button>
+            </>
+          )}
+        </div>
       </div>
-      <div className="history-list">
+
+      {selecting && (
+        <div className="hist-select-all" onClick={toggleAll}>
+          <input
+            type="checkbox"
+            className="hist-cb"
+            checked={allSelected}
+            onChange={toggleAll}
+            onClick={e => e.stopPropagation()}
+          />
+          <span>{allSelected ? 'Deselect all' : 'Select all'}</span>
+        </div>
+      )}
+
+      <div className={`history-list${selecting ? ' history-list-selecting' : ''}`}>
         {digests.map((d, i) => {
           const date = new Date(d.date + 'T12:00:00Z');
           const formatted = date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
@@ -296,9 +371,23 @@ export function HistoryScreen({ onViewDigest }) {
           const topArtists = (d.artists || []).slice(0, 3).map(a => a.name).join(', ');
           const headlines = (d.summary || '').slice(0, 90);
           const thumbs = (d.artists || []).slice(0, 3);
+          const isSelected = selected.has(d.date);
 
           return (
-            <div key={d.date} className="hist-row" onClick={() => onViewDigest(d)}>
+            <div
+              key={d.date}
+              className={`hist-row${isSelected ? ' hist-row-selected' : ''}`}
+              onClick={() => selecting ? toggleOne(d.date) : onViewDigest(d)}
+            >
+              {selecting && (
+                <input
+                  type="checkbox"
+                  className="hist-cb"
+                  checked={isSelected}
+                  onChange={() => toggleOne(d.date)}
+                  onClick={e => e.stopPropagation()}
+                />
+              )}
               <div className="hist-date">
                 <b>{formatted}</b>
                 <span className="hist-issue">#{d.id || i + 1} · {year}</span>

@@ -1250,10 +1250,43 @@ img { display: block; max-width: 100%; }
   padding: 20px 0;
   border-bottom: 1px solid var(--line-soft);
   cursor: pointer;
-  transition: padding 0.15s;
+  transition: padding 0.15s, background 0.1s;
 }
 .hist-row:hover { padding-left: 12px; }
 .hist-row:hover .hist-date { color: var(--accent); }
+
+/* Select mode */
+.history-list-selecting .hist-row {
+  grid-template-columns: 28px 120px 1fr 220px 80px;
+  padding-left: 4px;
+}
+.history-list-selecting .hist-row:hover { padding-left: 4px; }
+.history-list-selecting .hist-row:hover .hist-date { color: var(--text); }
+.hist-row-selected { background: rgba(30, 215, 96, 0.06); border-radius: 6px; }
+.hist-row-selected .hist-date { color: var(--accent) !important; }
+
+.hist-cb {
+  accent-color: var(--accent);
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.hist-select-all {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 4px;
+  border-bottom: 1px solid var(--line-soft);
+  cursor: pointer;
+  color: var(--muted);
+  font-family: var(--f-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.05em;
+  user-select: none;
+}
+.hist-select-all:hover { color: var(--text-2); }
 .hist-date {
   font-family: var(--f-mono);
   font-size: 12.5px;

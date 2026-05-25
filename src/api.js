@@ -21,6 +21,7 @@ export const api = {
   latestDigest:  ()         => j('/api/digest/latest'),
   digestList:    (page = 1) => j(`/api/digests?page=${page}`),
   digestByDate:  (date)     => j(`/api/digests/${date}`),
+  deleteDigests: (dates)    => j('/api/digests', { method: 'DELETE', body: JSON.stringify({ dates }) }),
   resendDigest:  (date)     => j(`/api/digests/${date}/resend`, { method: 'POST' }),
   runDigest:     (force)    => j('/api/run', { method: 'POST', body: JSON.stringify({ force }) }),
   runStream:     ()         => new EventSource(BASE + '/api/run/stream'),
