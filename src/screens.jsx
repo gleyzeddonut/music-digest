@@ -375,7 +375,7 @@ export function HistoryScreen({ onViewDigest, onDelete }) {
             <div
               key={d.date}
               className={`hist-row${isSelected ? ' hist-row-selected' : ''}`}
-              onClick={() => selecting ? toggleOne(d.date) : onViewDigest(d)}
+              onClick={() => selecting ? toggleOne(d.date) : onViewDigest(d.date)}
             >
               {selecting && (
                 <input

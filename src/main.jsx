@@ -192,6 +192,8 @@ function App() {
       setRawStatus(status);
       if (digest) {
         setData(adaptDigest(digest, list, status));
+      } else {
+        setData(null);
       }
       // Show onboarding only on first run (no email configured, and not previously dismissed)
       if (status && !status.configured && !localStorage.getItem('onboarding_done')) {

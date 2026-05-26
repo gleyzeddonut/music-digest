@@ -43,7 +43,6 @@ export const api = {
   spotifyDisconnect:       () => j('/auth/spotify', { method: 'DELETE' }),
   spotifyToken:            () => j('/api/spotify/token'),
   saveSpotifyPlaylistName: (name) => j('/api/settings/spotify-playlist-name', { method: 'POST', body: JSON.stringify({ name }) }),
-  saveSmtp:  (user, pass) => j('/api/settings/smtp', { method: 'POST', body: JSON.stringify({ user, pass }) }),
   monthly:   (year, month) => j(`/api/monthly/${year}/${month}`),
 };
 
