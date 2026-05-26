@@ -255,7 +255,7 @@ export function DigestScreen({ data, onArtistClick, onSongPlay, onReadBrief, run
 
 // ─── HistoryScreen ────────────────────────────────────────────
 
-export function HistoryScreen({ onViewDigest }) {
+export function HistoryScreen({ onViewDigest, onDelete }) {
   const [digests, setDigests] = React.useState(null);
   const [loading, setLoading] = React.useState(true);
   const [selecting, setSelecting] = React.useState(false);
@@ -296,6 +296,7 @@ export function HistoryScreen({ onViewDigest }) {
       setSelected(new Set());
       setSelecting(false);
       load();
+      onDelete?.();
       showToast(`Deleted ${n} digest${n !== 1 ? 's' : ''}`);
     } catch (err) {
       showToast(`Delete failed: ${err.message}`);

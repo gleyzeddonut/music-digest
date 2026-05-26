@@ -345,7 +345,7 @@ function App() {
       screen = <MonthlyScreen data={monthlyData} />;
       break;
     case 'history':
-      screen = <HistoryScreen onViewDigest={handleViewDigest} />;
+      screen = <HistoryScreen onViewDigest={handleViewDigest} onDelete={loadData} />;
       break;
     case 'sources':
       screen = <SourcesScreen />;
