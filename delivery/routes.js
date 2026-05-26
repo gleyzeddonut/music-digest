@@ -224,10 +224,7 @@ router.delete('/api/digests', (req, res) => {
   try {
     const db = getDb();
     const ph = dates.map(() => '?').join(',');
-    db.transaction(() => {
-      db.prepare(`DELETE FROM digests WHERE date IN (${ph})`).run(dates);
-      db.prepare(`DELETE FROM playlist_tracks WHERE digest_date IN (${ph})`).run(dates);
-    })();
+    db.prepare(`DELETE FROM digests WHERE date IN (${ph})`).run(dates);
     res.json({ ok: true, deleted: dates.length });
   } catch (err) {
     console.error('[routes] DELETE /api/digests failed:', err.message);
