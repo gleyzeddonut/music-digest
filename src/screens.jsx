@@ -574,6 +574,7 @@ export function SourcesScreen() {
 
 /* global __APP_VERSION__ */
 const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0';
+let _updateCheckCache = null; // fetch once per session, not per mount
 
 export function SettingsScreen({ onSpotifyConnect }) {
   const [settings, setSettings] = React.useState(null);
@@ -592,14 +593,23 @@ export function SettingsScreen({ onSpotifyConnect }) {
   React.useEffect(() => {
     reload();
     api.loginItem().then(d => { if (d.isElectron) setIsElectron(true); }).catch(() => {});
-    fetch('https://api.github.com/repos/gleyzeddonut/music-digest/releases/latest')
-      .then(r => r.ok ? r.json() : null)
-      .then(data => {
-        if (!data?.tag_name) return;
-        const latest = data.tag_name.replace(/^v/, '');
-        if (latest !== APP_VERSION) setLatestRelease({ version: latest, url: data.html_url });
+    if (_updateCheckCache) {
+      if (_updateCheckCache.release) setLatestRelease(_updateCheckCache.release);
+    } else {
+      fetch('https://api.github.com/repos/gleyzeddonut/music-digest/releases/latest', {
+        signal: AbortSignal.timeout(5000),
       })
-      .catch(() => {});
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          const latest = data?.tag_name?.replace(/^v/, '');
+          const release = latest && latest !== APP_VERSION
+            ? { version: latest, url: data.html_url }
+            : null;
+          _updateCheckCache = { release };
+          if (release) setLatestRelease(release);
+        })
+        .catch(() => { _updateCheckCache = { release: null }; });
+    }
   }, []);
 
   const save = async (patch) => {

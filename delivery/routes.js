@@ -27,7 +27,8 @@ function persistSetupConfig(digestTo, claudeApiKey, userName) {
 
 // ── Log streaming ─────────────────────────────────────────────
 const sseClients = new Set();
-let runLogBuffer = []; // replayed to late-connecting panels
+let runLogBuffer = [];   // replayed to late-connecting panels
+let runInProgress = false;
 
 function broadcastLog(level, args) {
   const msg = args.map(a => (a instanceof Error ? a.message : typeof a === 'string' ? a : String(a))).join(' ');
@@ -438,10 +439,12 @@ router.get('/api/run/stream', (req, res) => {
 });
 
 router.post('/api/run', async (req, res) => {
+  if (runInProgress) return res.status(409).json({ error: 'Run already in progress' });
   const { force } = req.body;
   res.json({ ok: true });
 
-  runLogBuffer = []; // clear for this run
+  runInProgress = true;
+  runLogBuffer = [];
 
   const origLog   = console.log;
   const origWarn  = console.warn;
@@ -458,10 +461,9 @@ router.post('/api/run', async (req, res) => {
     console.log   = origLog;
     console.warn  = origWarn;
     console.error = origError;
-    const done = JSON.stringify({ level: 'done', msg: '' });
-    for (const client of sseClients) {
-      try { client.write(`data: ${done}\n\n`); } catch (_) {}
-    }
+    broadcastLog('done', ['']);  // routes done through buffer so late panels see it
+    runLogBuffer = [];           // clear after done — panels opening between runs see nothing stale
+    runInProgress = false;
   }
 });
 

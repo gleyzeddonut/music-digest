@@ -195,8 +195,9 @@ function App() {
       } else {
         setData(null);
       }
-      // Show onboarding only on first run (no email configured, and not previously dismissed)
-      if (status && !status.configured && !localStorage.getItem('onboarding_done')) {
+      // Show onboarding whenever not configured; clear the skip-flag so a DB wipe re-triggers it
+      if (status && !status.configured) {
+        localStorage.removeItem('onboarding_done');
         setShowOnboarding(true);
       }
     } catch (err) {

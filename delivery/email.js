@@ -4,7 +4,7 @@ const { getDb } = require('../db/init');
 const { url: supabaseUrl, anonKey } = require('../supabase-client');
 
 function getDigestTo() {
-  return getDb().prepare('SELECT value FROM settings WHERE key = ?').get('digest_to')?.value || config.DIGEST_TO;
+  return getDb().prepare('SELECT value FROM settings WHERE key = ?').get('digest_to')?.value || '';
 }
 
 function getSmtpConfig() {
