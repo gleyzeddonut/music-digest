@@ -117,7 +117,7 @@ function Sidebar({ route, onNavigate, spotifyConnected }) {
         <div className="nav-label">Daily</div>
         <NavItem id="digest"  label="Today"      icon="today"    route={route} onNavigate={onNavigate} />
         <NavItem id="monthly" label="This Month" icon="monthly"  route={route} onNavigate={onNavigate} />
-        <NavItem id="history" label="Archive"    icon="history"  route={route} onNavigate={onNavigate} />
+        <NavItem id="history" label="History"    icon="history"  route={route} onNavigate={onNavigate} />
         <NavItem id="sources" label="Sources"  icon="sources" route={route} onNavigate={onNavigate} />
       </div>
 

@@ -311,7 +311,7 @@ export function HistoryScreen({ onViewDigest, onDelete }) {
     return (
       <div className="section">
         <div className="section-head">
-          <div><div className="section-eyebrow">Archive</div><h2 className="section-title">History</h2></div>
+          <div><div className="section-eyebrow">History</div><h2 className="section-title">History</h2></div>
         </div>
         <div style={{ color: 'var(--muted)', padding: '40px 0' }}>No digests yet — run your first one.</div>
       </div>
@@ -322,7 +322,7 @@ export function HistoryScreen({ onViewDigest, onDelete }) {
     <div className="section fade-in" style={{ paddingBottom: 80 }}>
       <div className="section-head">
         <div>
-          <div className="section-eyebrow">Archive</div>
+          <div className="section-eyebrow">History</div>
           <h2 className="section-title">History</h2>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginLeft: 'auto' }}>
