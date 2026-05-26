@@ -572,12 +572,16 @@ export function SourcesScreen() {
 
 // ─── SettingsScreen ───────────────────────────────────────────
 
+/* global __APP_VERSION__ */
+const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0';
+
 export function SettingsScreen({ onSpotifyConnect }) {
   const [settings, setSettings] = React.useState(null);
   const [status, setStatus] = React.useState(null);
   const [isElectron, setIsElectron] = React.useState(false);
   const [disconnecting, setDisconnecting] = React.useState(false);
   const [playlistName, setPlaylistName] = React.useState('🎵 Music Digest');
+  const [latestRelease, setLatestRelease] = React.useState(null); // { version, url } | null
 
   const reload = () => Promise.all([api.settings(), api.status()]).then(([s, st]) => {
     setSettings(s);
@@ -588,6 +592,14 @@ export function SettingsScreen({ onSpotifyConnect }) {
   React.useEffect(() => {
     reload();
     api.loginItem().then(d => { if (d.isElectron) setIsElectron(true); }).catch(() => {});
+    fetch('https://api.github.com/repos/gleyzeddonut/music-digest/releases/latest')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!data?.tag_name) return;
+        const latest = data.tag_name.replace(/^v/, '');
+        if (latest !== APP_VERSION) setLatestRelease({ version: latest, url: data.html_url });
+      })
+      .catch(() => {});
   }, []);
 
   const save = async (patch) => {
@@ -799,7 +811,17 @@ export function SettingsScreen({ onSpotifyConnect }) {
           {sectionLabel('System', 'App-level settings.')}
           <div className="set-card">
             <SettingRow label="Version">
-              <span className="v">1.0.3</span>
+              <span className="v">v{APP_VERSION}</span>
+              {latestRelease && (
+                <a
+                  href={latestRelease.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ marginLeft: 10, fontSize: 12, color: 'var(--accent)', textDecoration: 'none' }}
+                >
+                  v{latestRelease.version} available ↗
+                </a>
+              )}
             </SettingRow>
           </div>
         </div>
