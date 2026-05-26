@@ -27,11 +27,12 @@ function persistSetupConfig(digestTo, claudeApiKey, userName) {
 
 // ── Log streaming ─────────────────────────────────────────────
 const sseClients = new Set();
+let runLogBuffer = []; // replayed to late-connecting panels
 
 function broadcastLog(level, args) {
-  if (sseClients.size === 0) return;
   const msg = args.map(a => (a instanceof Error ? a.message : typeof a === 'string' ? a : String(a))).join(' ');
   const payload = JSON.stringify({ level, msg });
+  runLogBuffer.push(payload);
   for (const client of sseClients) {
     try { client.write(`data: ${payload}\n\n`); } catch (_) {}
   }
@@ -424,15 +425,23 @@ router.get('/api/run/stream', (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.socket?.setNoDelay(true);
   res.flushHeaders();
-  sseClients.add(res);
+  // Replay logs from the current run so late-opening panels catch up
+  for (const entry of runLogBuffer) {
+    res.write(`data: ${entry}\n\n`);
+  }
   res.write(`data: ${JSON.stringify({ level: 'ready', msg: '' })}\n\n`);
+  sseClients.add(res);
   req.on('close', () => sseClients.delete(res));
 });
 
 router.post('/api/run', async (req, res) => {
   const { force } = req.body;
   res.json({ ok: true });
+
+  runLogBuffer = []; // clear for this run
 
   const origLog   = console.log;
   const origWarn  = console.warn;
