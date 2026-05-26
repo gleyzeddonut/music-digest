@@ -71,7 +71,7 @@ function createTray() {
 
 // ── Window ────────────────────────────────────────────────────
 
-function createWindow(setupNeeded) {
+function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1100,
     height: 800,
@@ -88,7 +88,7 @@ function createWindow(setupNeeded) {
     mainWindow.loadURL('http://localhost:5173');
     mainWindow.webContents.openDevTools({ mode: 'detach' });
   } else {
-    mainWindow.loadURL(`http://localhost:3000${setupNeeded ? '/setup' : ''}`);
+    mainWindow.loadURL('http://localhost:3000');
   }
 
   // Hide instead of close so the scheduler keeps running
@@ -157,12 +157,8 @@ if (!gotLock) {
       return;
     }
 
-    // Check if first-run setup is needed
-    const { getConfig } = require('./config-store');
-    const setupNeeded = !getConfig('digest_to');
-
     buildAppMenu();
-    createWindow(setupNeeded);
+    createWindow();
     createTray();
 
     // Dev shortcuts (unpackaged only)

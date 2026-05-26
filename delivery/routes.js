@@ -39,18 +39,6 @@ function broadcastLog(level, args) {
 
 // ── Setup (first-run) ──────────────────────────────────────────
 
-router.get('/setup', (req, res) => {
-  res.sendFile(path.join(__dirname, '../public/setup.html'));
-});
-
-// Route guard: redirect to /setup if digest email not yet configured
-router.get('/', (req, res, next) => {
-  if (process.versions.electron) {
-    if (!configStore.getConfig('digest_to')) return res.redirect('/setup');
-  }
-  next(); // fall through to express.static which serves public/index.html
-});
-
 router.post('/api/setup', (req, res) => {
   if (!process.versions.electron) return res.status(404).json({ error: 'Not available outside Electron' });
   const { digestTo, claudeApiKey, userName } = req.body;
