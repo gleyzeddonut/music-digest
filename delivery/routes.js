@@ -365,7 +365,7 @@ router.get('/api/settings', (req, res) => {
   const config = require('../config');
   const db_get = (key, fallback) => { const v = dbSettings[key]; return v != null ? v : fallback; };
   res.json({
-    email:           db_get('digest_to',            config.DIGEST_TO),
+    email:           db_get('digest_to',            ''),
     sendTime:        db_get('schedule_send_time',   config.SEND_TIME),
     frequency:       db_get('schedule_frequency',   'daily'),
     weekDay:         parseInt(db_get('schedule_week_day',   '5'),  10),
@@ -462,7 +462,7 @@ router.get('/api/status', (req, res) => {
   const db = getDb();
   const lastDigest = db.prepare('SELECT date, created_at FROM digests ORDER BY date DESC LIMIT 1').get();
   const config = require('../config');
-  const digestTo = db.prepare("SELECT value FROM settings WHERE key = 'digest_to'").get()?.value || config.DIGEST_TO || '';
+  const digestTo = db.prepare("SELECT value FROM settings WHERE key = 'digest_to'").get()?.value || '';
   res.json({
     spotify: { connected: isConnected(), playlistUrl: getPlaylistUrl() },
     lastDigest: lastDigest || null,
