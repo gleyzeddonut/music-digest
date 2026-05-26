@@ -218,16 +218,21 @@ router.get('/api/digests', (req, res) => {
 });
 
 router.delete('/api/digests', (req, res) => {
-  const { dates } = req.body;
+  const { dates } = req.body || {};
   if (!Array.isArray(dates) || dates.length === 0)
     return res.status(400).json({ error: 'dates array required' });
-  const db = getDb();
-  const ph = dates.map(() => '?').join(',');
-  db.transaction(() => {
-    db.prepare(`DELETE FROM digests WHERE date IN (${ph})`).run(...dates);
-    db.prepare(`DELETE FROM playlist_tracks WHERE digest_date IN (${ph})`).run(...dates);
-  })();
-  res.json({ ok: true, deleted: dates.length });
+  try {
+    const db = getDb();
+    const ph = dates.map(() => '?').join(',');
+    db.transaction(() => {
+      db.prepare(`DELETE FROM digests WHERE date IN (${ph})`).run(dates);
+      db.prepare(`DELETE FROM playlist_tracks WHERE digest_date IN (${ph})`).run(dates);
+    })();
+    res.json({ ok: true, deleted: dates.length });
+  } catch (err) {
+    console.error('[routes] DELETE /api/digests failed:', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 router.get('/api/monthly/:year/:month', (req, res) => {

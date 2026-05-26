@@ -297,8 +297,8 @@ export function HistoryScreen({ onViewDigest }) {
       setSelecting(false);
       load();
       showToast(`Deleted ${n} digest${n !== 1 ? 's' : ''}`);
-    } catch {
-      showToast('Delete failed');
+    } catch (err) {
+      showToast(`Delete failed: ${err.message}`);
     } finally {
       setDeleting(false);
     }
