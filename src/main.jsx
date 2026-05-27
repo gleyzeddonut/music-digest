@@ -217,8 +217,11 @@ function App() {
     setRunning(true);
 
     let es;
+    let finished = false;
     const finish = (msg) => {
-      es?.close();
+      if (finished) return;
+      finished = true;
+      if (es) { es.onerror = null; es.close(); }
       if (msg) showToast(msg);
       loadData();
       setRunning(false);
