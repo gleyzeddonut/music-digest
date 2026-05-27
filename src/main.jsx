@@ -179,6 +179,7 @@ function App() {
   const [selectedArtist, setSelectedArtist] = useState(null);
   const [showLog, setShowLog] = useState(false);
   const [monthlyData, setMonthlyData] = useState(null);
+  const [settingsRefresh, setSettingsRefresh] = useState(0);
 
   // ── Initial load ────────────────────────────────────────────────────────────
 
@@ -261,7 +262,7 @@ function App() {
       if (Date.now() > deadline) { clearInterval(poll); return; }
       try {
         const s = await api.status();
-        if (s?.spotify?.connected) { clearInterval(poll); loadData(); }
+        if (s?.spotify?.connected) { clearInterval(poll); loadData(); setSettingsRefresh(n => n + 1); }
       } catch {}
     }, 2000);
   }, [loadData]);
@@ -357,6 +358,7 @@ function App() {
       screen = (
         <SettingsScreen
           onSpotifyConnect={handleSpotifyConnect}
+          refreshTrigger={settingsRefresh}
         />
       );
       break;

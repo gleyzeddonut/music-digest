@@ -576,7 +576,7 @@ export function SourcesScreen() {
 const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0';
 let _updateCheckCache = null; // fetch once per session, not per mount
 
-export function SettingsScreen({ onSpotifyConnect }) {
+export function SettingsScreen({ onSpotifyConnect, refreshTrigger = 0 }) {
   const [settings, setSettings] = React.useState(null);
   const [status, setStatus] = React.useState(null);
   const [isElectron, setIsElectron] = React.useState(false);
@@ -611,6 +611,10 @@ export function SettingsScreen({ onSpotifyConnect }) {
         .catch(() => { _updateCheckCache = { release: null }; });
     }
   }, []);
+
+  React.useEffect(() => {
+    if (refreshTrigger > 0) reload();
+  }, [refreshTrigger]);
 
   const save = async (patch) => {
     try {

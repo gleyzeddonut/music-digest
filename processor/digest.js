@@ -126,18 +126,22 @@ async function runDigest(opts = {}) {
   let spotifyUnmatched = [];
   if (result.songs?.length > 0) {
     console.log('[PHASE] Spotify');
-    const spotifyResult = await appendSongsToPlaylist(result.songs, date);
-    playlistUrl = spotifyResult.playlistUrl;
-    spotifyAdded = spotifyResult.added;
-    spotifyUnmatched = spotifyResult.unmatched;
+    try {
+      const spotifyResult = await appendSongsToPlaylist(result.songs, date);
+      playlistUrl = spotifyResult.playlistUrl;
+      spotifyAdded = spotifyResult.added;
+      spotifyUnmatched = spotifyResult.unmatched;
 
-    // Attach Spotify track IDs to songs so the UI can link directly to tracks
-    const addedByTitle = {};
-    for (const a of spotifyAdded) addedByTitle[(a.title || '').toLowerCase()] = a;
-    result.songs = (result.songs || []).map(s => {
-      const match = addedByTitle[(s.title || '').toLowerCase()];
-      return match ? { ...s, spotify_id: match.id, preview_url: match.preview_url || null } : s;
-    });
+      // Attach Spotify track IDs to songs so the UI can link directly to tracks
+      const addedByTitle = {};
+      for (const a of spotifyAdded) addedByTitle[(a.title || '').toLowerCase()] = a;
+      result.songs = (result.songs || []).map(s => {
+        const match = addedByTitle[(s.title || '').toLowerCase()];
+        return match ? { ...s, spotify_id: match.id, preview_url: match.preview_url || null } : s;
+      });
+    } catch (err) {
+      console.warn(`[digest] Spotify step failed (${err.message}) — continuing without playlist update`);
+    }
   }
 
   // 6. Save to DB

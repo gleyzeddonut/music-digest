@@ -226,7 +226,6 @@ img { display: block; max-width: 100%; }
   background: rgba(8, 9, 10, 0.94);
   border-bottom: 1px solid var(--line-soft);
   min-width: 0;
-  overflow: hidden;
 }
 .topbar .crumb {
   font-family: var(--f-mono);
