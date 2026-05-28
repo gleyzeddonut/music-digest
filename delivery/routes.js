@@ -25,11 +25,29 @@ function getActivePersonaId() {
   return db.prepare('SELECT id FROM personas WHERE is_default = 1').get()?.id ?? null;
 }
 
-// Attach the active persona ID to every request.
+// Attach the active persona ID (and isDefault flag) to every request.
 router.use((req, res, next) => {
-  try { req.activePersonaId = getActivePersonaId(); } catch (_) { req.activePersonaId = null; }
+  try {
+    const id = getActivePersonaId();
+    req.activePersonaId = id;
+    req.activePersonaIsDefault = id
+      ? !!getDb().prepare('SELECT is_default FROM personas WHERE id = ?').get(id)?.is_default
+      : true;
+  } catch (_) {
+    req.activePersonaId = null;
+    req.activePersonaIsDefault = true;
+  }
   next();
 });
+
+// Returns [whereClause, paramsArray] for filtering digests/tracks by active persona.
+// All Sources persona also surfaces legacy rows (persona_id IS NULL).
+function personaWhere(req, col = 'persona_id') {
+  if (req.activePersonaIsDefault) {
+    return [`(${col} = ? OR ${col} IS NULL)`, [req.activePersonaId]];
+  }
+  return [`${col} = ?`, [req.activePersonaId]];
+}
 
 // Persists user-supplied setup values to all three stores so the current
 // session, DB scheduler, and next app launch all see the new values.
@@ -263,29 +281,33 @@ router.delete('/api/personas/:id', (req, res) => {
 
 router.get('/api/digest/latest', (req, res) => {
   const db = getDb();
-  const digest = db.prepare('SELECT * FROM digests ORDER BY date DESC LIMIT 1').get();
+  const [where, params] = personaWhere(req);
+  const digest = db.prepare(`SELECT * FROM digests WHERE ${where} ORDER BY date DESC LIMIT 1`).get(...params);
   if (!digest) return res.json(null);
   res.json(parseDigest(digest));
 });
 
 router.get('/api/digests/:date', (req, res) => {
-  const digest = getDb().prepare('SELECT * FROM digests WHERE date = ?').get(req.params.date);
+  const [where, params] = personaWhere(req);
+  const digest = getDb().prepare(`SELECT * FROM digests WHERE date = ? AND ${where}`).get(req.params.date, ...params);
   if (!digest) return res.status(404).json({ error: 'Not found' });
   res.json(parseDigest(digest));
 });
 
 router.post('/api/digests/:date/resend', async (req, res) => {
   const db = getDb();
-  const row = db.prepare('SELECT * FROM digests WHERE date = ?').get(req.params.date);
+  const [where, params] = personaWhere(req);
+  const row = db.prepare(`SELECT * FROM digests WHERE date = ? AND ${where}`).get(req.params.date, ...params);
   if (!row) return res.status(404).json({ error: 'Digest not found' });
 
   const to = db.prepare("SELECT value FROM settings WHERE key = 'digest_to'").get()?.value;
   if (!to) return res.status(400).json({ error: 'No recipient email configured — set one in Settings → Delivery' });
 
   const result = parseDigest(row);
+  const [trackWhere, trackParams] = personaWhere(req, 'pt.persona_id');
   const added = db.prepare(
-    'SELECT track_name AS title, artist_name AS artist, track_id AS id FROM playlist_tracks WHERE digest_date = ?'
-  ).all(req.params.date);
+    `SELECT pt.track_name AS title, pt.artist_name AS artist, pt.track_id AS id FROM playlist_tracks pt WHERE pt.digest_date = ? AND ${trackWhere}`
+  ).all(req.params.date, ...trackParams);
   const addedTitles = new Set(added.map(a => (a.title || '').toLowerCase()));
   const unmatched = result.songs.filter(s => !addedTitles.has((s.title || '').toLowerCase()));
 
@@ -302,8 +324,9 @@ router.get('/api/digests', (req, res) => {
   const page = parseInt(req.query.page || '1', 10);
   const limit = 20;
   const offset = (page - 1) * limit;
-  const digests = db.prepare('SELECT * FROM digests ORDER BY date DESC LIMIT ? OFFSET ?').all(limit, offset);
-  const total = db.prepare('SELECT COUNT(*) as n FROM digests').get().n;
+  const [where, params] = personaWhere(req);
+  const digests = db.prepare(`SELECT * FROM digests WHERE ${where} ORDER BY date DESC LIMIT ? OFFSET ?`).all(...params, limit, offset);
+  const total = db.prepare(`SELECT COUNT(*) as n FROM digests WHERE ${where}`).get(...params).n;
   res.json({ digests: digests.map(parseDigest), total, page });
 });
 
@@ -313,8 +336,9 @@ router.delete('/api/digests', (req, res) => {
     return res.status(400).json({ error: 'dates array required' });
   try {
     const db = getDb();
+    const [where, personaParams] = personaWhere(req);
     const ph = dates.map(() => '?').join(',');
-    db.prepare(`DELETE FROM digests WHERE date IN (${ph})`).run(dates);
+    db.prepare(`DELETE FROM digests WHERE date IN (${ph}) AND ${where}`).run(...dates, ...personaParams);
     res.json({ ok: true, deleted: dates.length });
   } catch (err) {
     console.error('[routes] DELETE /api/digests failed:', err.message);
@@ -329,9 +353,10 @@ router.get('/api/monthly/:year/:month', (req, res) => {
   const label = new Date(parseInt(year, 10), parseInt(month, 10) - 1, 1)
     .toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
+  const [personaClause, personaParams] = personaWhere(req);
   const rows = db.prepare(
-    'SELECT date, artists, songs, headlines FROM digests WHERE date LIKE ? ORDER BY date ASC'
-  ).all(`${prefix}-%`);
+    `SELECT date, artists, songs, headlines FROM digests WHERE date LIKE ? AND ${personaClause} ORDER BY date ASC`
+  ).all(`${prefix}-%`, ...personaParams);
 
   if (rows.length === 0) {
     return res.json({ month: label, monthKey: prefix, digestCount: 0, headlineCount: 0, artists: [], songs: [] });
@@ -381,9 +406,10 @@ router.get('/api/monthly/:year/:month', (req, res) => {
 });
 
 router.get('/api/playlist_tracks', (req, res) => {
+  const [where, params] = personaWhere(req);
   const tracks = getDb()
-    .prepare('SELECT track_id AS spotify_id, track_name AS title, artist_name AS artist, added_at, digest_date FROM playlist_tracks ORDER BY added_at DESC')
-    .all();
+    .prepare(`SELECT track_id AS spotify_id, track_name AS title, artist_name AS artist, added_at, digest_date FROM playlist_tracks WHERE ${where} ORDER BY added_at DESC`)
+    .all(...params);
   res.json({ tracks });
 });
 
@@ -580,7 +606,7 @@ router.get('/api/status', (req, res) => {
     sendTime: config.SEND_TIME,
     timezone: config.TIMEZONE,
     sourcesCount: db.prepare('SELECT COUNT(*) as n FROM sources WHERE enabled = 1').get().n,
-    tracksInPlaylist: db.prepare('SELECT COUNT(*) as n FROM playlist_tracks').get().n,
+    tracksInPlaylist: (() => { const [w, p] = personaWhere(req); return db.prepare(`SELECT COUNT(*) as n FROM playlist_tracks WHERE ${w}`).get(...p).n; })(),
     userName: db.prepare("SELECT value FROM settings WHERE key = 'user_name'").get()?.value || '',
     configured: !!digestTo,
   });
