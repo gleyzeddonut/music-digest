@@ -105,13 +105,37 @@ function NavItem({ id, label, icon, route, onNavigate }) {
   );
 }
 
-function Sidebar({ route, onNavigate, spotifyConnected }) {
+function Sidebar({ route, onNavigate, spotifyConnected, personas = [], activePersonaId, onPersonaSwitch, onManagePersonas }) {
   return (
     <aside className="sidebar">
       <div className="brand">
         <BrandMark />
         <span className="brand-name">Music <em>Digest</em></span>
       </div>
+
+      {personas.length > 0 && (
+        <div className="persona-switcher">
+          <div className="persona-list">
+            {personas.map(p => (
+              <button
+                key={p.id}
+                className={`persona-chip${p.id === activePersonaId ? ' active' : ''}`}
+                onClick={() => onPersonaSwitch(p.id)}
+                title={p.name}
+              >
+                {p.name}
+              </button>
+            ))}
+            <button
+              className="persona-chip persona-chip-add"
+              onClick={onManagePersonas}
+              title="Manage personas"
+            >
+              +
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="nav-group">
         <div className="nav-label">Daily</div>

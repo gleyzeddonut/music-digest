@@ -13,6 +13,7 @@ import {
   MonthlyScreen,
   Onboarding,
   LoadingShell,
+  PersonaEditorScreen,
 } from './screens.jsx';
 import { WelcomeScreen } from './WelcomeScreen.jsx';
 
@@ -180,17 +181,23 @@ function App() {
   const [showLog, setShowLog] = useState(false);
   const [monthlyData, setMonthlyData] = useState(null);
   const [settingsRefresh, setSettingsRefresh] = useState(0);
+  const [personas, setPersonas] = useState([]);
+  const [activePersonaId, setActivePersonaId] = useState(null);
 
   // ── Initial load ────────────────────────────────────────────────────────────
 
   const loadData = useCallback(async () => {
     try {
-      const [digest, list, status] = await Promise.all([
+      const [digest, list, status, personaList, activePersona] = await Promise.all([
         api.latestDigest().catch(() => null),
         api.digestList().catch(() => ({ digests: [], total: 0 })),
         api.status().catch(() => ({})),
+        api.personas().catch(() => []),
+        api.activePersona().catch(() => null),
       ]);
       setRawStatus(status);
+      setPersonas(personaList);
+      if (activePersona) setActivePersonaId(activePersona.id);
       if (digest) {
         setData(adaptDigest(digest, list, status));
       } else {
@@ -250,6 +257,20 @@ function App() {
       setRunning(false);
     }
   }, [running, loadData]);
+
+  // ── Persona switch ─────────────────────────────────────────────
+
+  const handlePersonaSwitch = useCallback(async (id) => {
+    if (id === activePersonaId) return;
+    try {
+      await api.setActivePersona(id);
+      setActivePersonaId(id);
+      setData(null); // clear stale digest immediately
+      loadData();
+    } catch (err) {
+      console.error('[App] persona switch failed:', err);
+    }
+  }, [activePersonaId, loadData]);
 
   // ── Spotify connect ─────────────────────────────────────────────────────────
 
@@ -386,6 +407,9 @@ function App() {
     case 'playlist':
       screen = <PlaylistScreen status={rawStatus} />;
       break;
+    case 'personas':
+      screen = <PersonaEditorScreen onDone={() => { loadData(); navigate('digest'); }} />;
+      break;
     case 'digest':
     default:
       screen = data ? (
@@ -413,6 +437,7 @@ function App() {
     route === 'playlist' ? 'Playlist' :
     route === 'brief'    ? 'The Brief' :
     route === 'artist'   ? (selectedArtist?.name || 'Artist') :
+    route === 'personas' ? 'Personas' :
     data?.issue?.date    ? `${data.issue.date} · Issue #${data.issue.number}` : 'Music Digest';
 
   return (
@@ -421,6 +446,10 @@ function App() {
         route={route}
         onNavigate={navigate}
         spotifyConnected={spotifyConnected}
+        personas={personas}
+        activePersonaId={activePersonaId}
+        onPersonaSwitch={handlePersonaSwitch}
+        onManagePersonas={() => navigate('personas')}
       />
       <div className="main-col">
         <Topbar
