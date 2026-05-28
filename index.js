@@ -70,7 +70,9 @@ function startServer() {
         lastScheduledRun = todayKey;
         console.log(`\n[${now.toISOString()}] ── Scheduled digest run starting ──`);
         try {
-          const result = await runDigest({ sendEmail: true });
+          const storedPersonaId = getSetting('active_persona_id', null);
+          const personaId = storedPersonaId ? parseInt(storedPersonaId, 10) || null : null;
+          const result = await runDigest({ sendEmail: true, personaId });
           if (result.skipped) {
             console.log(`[digest] Already ran today, skipped`);
           } else {

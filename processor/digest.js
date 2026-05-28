@@ -23,19 +23,56 @@ async function runDigest(opts = {}) {
   const date = opts.date || today();
   const db = getDb();
 
-  // Prevent double-run on the same day unless forced
+  // Resolve personaId — from opts, or fall back to active persona in settings
+  let personaId = (opts.personaId != null) ? opts.personaId : null;
+  if (!personaId) {
+    const stored = db.prepare("SELECT value FROM settings WHERE key = 'active_persona_id'").get()?.value;
+    if (stored) {
+      const parsed = parseInt(stored, 10);
+      if (!isNaN(parsed)) personaId = parsed;
+    }
+  }
+  const persona = personaId
+    ? db.prepare('SELECT * FROM personas WHERE id = ?').get(personaId)
+    : db.prepare('SELECT * FROM personas WHERE is_default = 1').get();
+  // Fall back to default if the requested persona doesn't exist
+  if (!persona) {
+    const defaultPersona = db.prepare('SELECT * FROM personas WHERE is_default = 1').get();
+    if (!defaultPersona) return { error: 'No personas configured', date };
+    personaId = defaultPersona.id;
+  } else {
+    personaId = persona.id;
+  }
+
+  // Prevent double-run on the same day + persona unless forced
   if (!opts.force) {
-    const existing = db.prepare('SELECT id FROM digests WHERE date = ?').get(date);
+    const existing = db.prepare('SELECT id FROM digests WHERE date = ? AND persona_id = ?').get(date, personaId);
     if (existing) {
-      console.log(`[digest] Already ran for ${date}, skipping (pass force:true to override)`);
+      console.log(`[digest] Already ran for ${date} (persona ${personaId}), skipping (pass force:true to override)`);
       return { skipped: true, date };
     }
   }
 
-  console.log(`[digest] Starting run for ${date}...`);
+  console.log(`[digest] Starting run for ${date} (persona ${personaId})...`);
 
-  // 1. Load enabled sources
-  const sources = db.prepare('SELECT * FROM sources WHERE enabled = 1').all();
+  // 1. Load sources for this persona
+  let sources;
+  if (persona && persona.is_default) {
+    sources = db.prepare('SELECT * FROM sources WHERE enabled = 1').all();
+  } else {
+    const rawIds = (() => { try { return JSON.parse(persona?.source_ids || '[]'); } catch { return []; } })();
+    const validIds = rawIds.filter(n => Number.isInteger(n) && n > 0);
+    if (validIds.length === 0) {
+      console.warn('[digest] Persona has no sources — aborting run');
+      return { error: 'Persona has no sources', date };
+    }
+    const ph = validIds.map(() => '?').join(',');
+    sources = db.prepare(`SELECT * FROM sources WHERE id IN (${ph}) AND enabled = 1`).all(...validIds);
+  }
+  if (sources.length === 0) {
+    console.warn('[digest] No enabled sources for this persona — aborting run');
+    return { error: 'No enabled sources for this persona', date };
+  }
   const redditSources    = sources.filter(s => s.type === 'reddit');
   const webSources       = sources.filter(s => s.type === 'rss' || s.type === 'html');
   const tiktokSources    = sources.filter(s => s.type === 'tiktok');
@@ -127,7 +164,7 @@ async function runDigest(opts = {}) {
   if (result.songs?.length > 0) {
     console.log('[PHASE] Spotify');
     try {
-      const spotifyResult = await appendSongsToPlaylist(result.songs, date);
+      const spotifyResult = await appendSongsToPlaylist(result.songs, date, personaId);
       playlistUrl = spotifyResult.playlistUrl;
       spotifyAdded = spotifyResult.added;
       spotifyUnmatched = spotifyResult.unmatched;
@@ -147,10 +184,11 @@ async function runDigest(opts = {}) {
   // 6. Save to DB
   console.log('[PHASE] Saving');
   db.prepare(`
-    INSERT OR REPLACE INTO digests (date, summary, artists, songs, headlines, playlist_url, mentioned_artists)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+    INSERT OR REPLACE INTO digests (date, persona_id, summary, artists, songs, headlines, playlist_url, mentioned_artists)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     date,
+    personaId,
     result.summary,
     JSON.stringify(result.artists || []),
     JSON.stringify(result.songs || []),

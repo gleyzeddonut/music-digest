@@ -554,7 +554,7 @@ router.post('/api/run', async (req, res) => {
   console.error = (...a) => { origError(...a); broadcastLog('error', a); };
 
   try {
-    await runDigest({ force: !!force });
+    await runDigest({ force: !!force, personaId: req.activePersonaId });
   } catch (err) {
     broadcastLog('error', ['[run] Error: ' + err.message]);
   } finally {
