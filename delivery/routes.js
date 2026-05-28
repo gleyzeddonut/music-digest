@@ -575,7 +575,7 @@ router.get('/api/status', (req, res) => {
   const config = require('../config');
   const digestTo = db.prepare("SELECT value FROM settings WHERE key = 'digest_to'").get()?.value || '';
   res.json({
-    spotify: { connected: isConnected(), playlistUrl: getPlaylistUrl() },
+    spotify: { connected: isConnected(), playlistUrl: getPlaylistUrl(req.activePersonaId) },
     lastDigest: lastDigest || null,
     sendTime: config.SEND_TIME,
     timezone: config.TIMEZONE,

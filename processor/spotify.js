@@ -48,7 +48,9 @@ async function handleCallback(code) {
   setSetting('spotify_access_token', data.access_token);
   setSetting('spotify_refresh_token', data.refresh_token);
   setSetting('spotify_token_expires_at', String(Date.now() + data.expires_in * 1000));
+  // Clear all playlist IDs (global and per-persona) so they are re-created under the new account
   getDb().prepare("DELETE FROM settings WHERE key = 'spotify_playlist_id'").run();
+  getDb().prepare("DELETE FROM settings WHERE key LIKE 'spotify_playlist_id_%'").run();
   console.log('[spotify] OAuth complete, tokens saved');
 }
 
@@ -86,16 +88,22 @@ function spotifyApi(token) {
 
 // ── Playlist management ───────────────────────────────────────
 
-async function getOrCreatePlaylist(api) {
-  const existingId = getSetting('spotify_playlist_id');
-  const name = getSetting('spotify_playlist_name') || DEFAULT_PLAYLIST_NAME;
+async function getOrCreatePlaylist(api, personaId) {
+  const idKey   = `spotify_playlist_id_${personaId}`;
+  const nameKey = `spotify_playlist_name_${personaId}`;
+
+  // Derive default name from persona, e.g. "Indie World · Music Digest"
+  const persona = personaId ? getDb().prepare('SELECT name FROM personas WHERE id = ?').get(personaId) : null;
+  const defaultName = persona?.name ? `${persona.name} · Music Digest` : DEFAULT_PLAYLIST_NAME;
+
+  const existingId = getSetting(idKey);
+  const name = getSetting(nameKey) || defaultName;
   const { data: me } = await api.get('/me');
 
   if (existingId) {
     try {
       const { data: pl } = await api.get(`/playlists/${existingId}`);
       if (pl.owner?.id === me.id) {
-        // Rename on Spotify if the user changed the name
         if (pl.name !== name) {
           await api.put(`/playlists/${existingId}`, { name });
           console.log(`[spotify] Renamed playlist to "${name}"`);
@@ -106,7 +114,7 @@ async function getOrCreatePlaylist(api) {
     } catch {
       // Playlist deleted or inaccessible — fall through to create
     }
-    getDb().prepare("DELETE FROM settings WHERE key = 'spotify_playlist_id'").run();
+    getDb().prepare('DELETE FROM settings WHERE key = ?').run(idKey);
   }
 
   const { data: playlist } = await api.post(`/users/${me.id}/playlists`, {
@@ -115,9 +123,9 @@ async function getOrCreatePlaylist(api) {
     public: true,
   });
 
-  setSetting('spotify_playlist_id', playlist.id);
-  // New playlist — local dedup records from any previous playlist are now stale
-  getDb().prepare('DELETE FROM playlist_tracks').run();
+  setSetting(idKey, playlist.id);
+  // New playlist — local dedup records for this persona are now stale
+  getDb().prepare('DELETE FROM playlist_tracks WHERE persona_id = ?').run(personaId);
   console.log(`[spotify] Created playlist "${name}": ${playlist.external_urls.spotify}`);
   return playlist.id;
 }
@@ -142,7 +150,7 @@ async function searchTrack(api, title, artist) {
   return null;
 }
 
-async function appendSongsToPlaylist(songs, date) {
+async function appendSongsToPlaylist(songs, date, personaId) {
   const token = await getAccessToken();
   if (!token) {
     console.warn('[spotify] Not authenticated — skipping playlist update');
@@ -156,11 +164,11 @@ async function appendSongsToPlaylist(songs, date) {
   songs = eligible;
 
   const api = spotifyApi(token);
-  const playlistId = await getOrCreatePlaylist(api);
+  const playlistId = await getOrCreatePlaylist(api, personaId);
   const db = getDb();
-  const alreadyAdded = db.prepare('SELECT track_id FROM playlist_tracks WHERE track_id = ?');
+  const alreadyAdded = db.prepare('SELECT track_id FROM playlist_tracks WHERE track_id = ? AND persona_id = ?');
   const insertTrack = db.prepare(
-    'INSERT OR IGNORE INTO playlist_tracks (track_id, track_name, artist_name, digest_date) VALUES (?, ?, ?, ?)'
+    'INSERT OR IGNORE INTO playlist_tracks (track_id, persona_id, track_name, artist_name, digest_date) VALUES (?, ?, ?, ?, ?)'
   );
 
   const added = [];
@@ -177,7 +185,7 @@ async function appendSongsToPlaylist(songs, date) {
       continue;
     }
 
-    if (alreadyAdded.get(track.id)) {
+    if (alreadyAdded.get(track.id, personaId)) {
       console.log(`[spotify] Already in playlist: "${track.name}"`);
       continue;
     }
@@ -193,7 +201,7 @@ async function appendSongsToPlaylist(songs, date) {
     }
     // Only mark as added in local DB after Spotify confirms them
     for (const t of tracksToAdd) {
-      insertTrack.run(t.id, t.name, t.artist, date);
+      insertTrack.run(t.id, personaId, t.name, t.artist, date);
       added.push({ title: t.name, artist: t.artist, id: t.id, preview_url: t.preview_url });
     }
     console.log(`[spotify] Added ${tracksToAdd.length} tracks to playlist`);
@@ -207,8 +215,10 @@ function isConnected() {
   return !!(getSetting('spotify_access_token') && getSetting('spotify_refresh_token'));
 }
 
-function getPlaylistUrl() {
-  const id = getSetting('spotify_playlist_id');
+function getPlaylistUrl(personaId) {
+  const id = personaId
+    ? getSetting(`spotify_playlist_id_${personaId}`)
+    : getSetting('spotify_playlist_id');
   return id ? `https://open.spotify.com/playlist/${id}` : null;
 }
 
