@@ -32,13 +32,14 @@ async function runDigest(opts = {}) {
       if (!isNaN(parsed)) personaId = parsed;
     }
   }
-  const persona = personaId
+  let persona = personaId
     ? db.prepare('SELECT * FROM personas WHERE id = ?').get(personaId)
     : db.prepare('SELECT * FROM personas WHERE is_default = 1').get();
   // Fall back to default if the requested persona doesn't exist
   if (!persona) {
     const defaultPersona = db.prepare('SELECT * FROM personas WHERE is_default = 1').get();
     if (!defaultPersona) return { error: 'No personas configured', date };
+    persona = defaultPersona;
     personaId = defaultPersona.id;
   } else {
     personaId = persona.id;

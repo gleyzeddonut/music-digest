@@ -42,8 +42,10 @@ router.use((req, res, next) => {
 
 // Returns [whereClause, paramsArray] for filtering digests/tracks by active persona.
 // All Sources persona also surfaces legacy rows (persona_id IS NULL).
+// If activePersonaId is null (DB failure at middleware time), show all rows rather than silently filtering to nothing.
 function personaWhere(req, col = 'persona_id') {
   if (req.activePersonaIsDefault) {
+    if (!req.activePersonaId) return ['1=1', []];
     return [`(${col} = ? OR ${col} IS NULL)`, [req.activePersonaId]];
   }
   return [`${col} = ?`, [req.activePersonaId]];
@@ -180,9 +182,10 @@ router.delete('/auth/spotify', (req, res) => {
   del('spotify_refresh_token');
   del('spotify_token_expires_at');
   del('spotify_playlist_id');
-  // Clean per-persona playlist keys
+  // Clean per-persona playlist keys and dedup history
   db.prepare("DELETE FROM settings WHERE key LIKE 'spotify_playlist_id_%'").run();
   db.prepare("DELETE FROM settings WHERE key LIKE 'spotify_playlist_name_%'").run();
+  // OAuth is shared — disconnect clears all personas' dedup state so reconnect starts fresh
   db.prepare('DELETE FROM playlist_tracks').run();
   res.json({ ok: true });
 });
@@ -245,12 +248,16 @@ router.patch('/api/personas/:id', (req, res) => {
   const persona = db.prepare('SELECT * FROM personas WHERE id = ?').get(id);
   if (!persona) return res.status(404).json({ error: 'Persona not found' });
   const { name, sourceIds } = req.body || {};
-  if (name !== undefined) db.prepare('UPDATE personas SET name = ? WHERE id = ?').run(name.trim(), id);
-  if (sourceIds !== undefined) {
-    if (!Array.isArray(sourceIds)) return res.status(400).json({ error: 'sourceIds must be an array' });
-    const validIds = sourceIds.filter(n => Number.isInteger(n) && n > 0);
-    db.prepare('UPDATE personas SET source_ids = ? WHERE id = ?').run(JSON.stringify(validIds), id);
-  }
+  // Validate before any writes
+  if (name !== undefined && typeof name !== 'string') return res.status(400).json({ error: 'name must be a string' });
+  if (sourceIds !== undefined && !Array.isArray(sourceIds)) return res.status(400).json({ error: 'sourceIds must be an array' });
+  db.transaction(() => {
+    if (name !== undefined) db.prepare('UPDATE personas SET name = ? WHERE id = ?').run(name.trim(), id);
+    if (sourceIds !== undefined) {
+      const validIds = sourceIds.filter(n => Number.isInteger(n) && n > 0);
+      db.prepare('UPDATE personas SET source_ids = ? WHERE id = ?').run(JSON.stringify(validIds), id);
+    }
+  })();
   res.json({ ok: true });
 });
 
@@ -503,7 +510,7 @@ router.get('/api/settings', (req, res) => {
     timezone:        config.TIMEZONE,
     spotify: {
       connected: isConnected(),
-      playlistUrl: getPlaylistUrl(),
+      playlistUrl: getPlaylistUrl(req.activePersonaId),
       playlistName: db_get('spotify_playlist_name', '🎵 Music Digest'),
     },
   });
