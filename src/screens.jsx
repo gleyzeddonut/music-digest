@@ -1456,6 +1456,166 @@ export function MonthlyScreen({ data }) {
   );
 }
 
+// ─── PersonaEditorScreen ──────────────────────────────────────
+
+export function PersonaEditorScreen({ onDone }) {
+  const [personas, setPersonas] = React.useState(null);
+  const [sources, setSources] = React.useState([]);
+  const [editingId, setEditingId] = React.useState(null); // persona id being edited, or 'new'
+  const [editName, setEditName] = React.useState('');
+  const [editSourceIds, setEditSourceIds] = React.useState([]);
+  const [saving, setSaving] = React.useState(false);
+
+  const reload = () => Promise.all([api.personas(), api.sources()])
+    .then(([ps, ss]) => { setPersonas(ps); setSources(ss.filter(s => s.enabled)); });
+
+  React.useEffect(() => { reload(); }, []);
+
+  const startNew = () => { setEditingId('new'); setEditName(''); setEditSourceIds([]); };
+  const startEdit = (p) => {
+    setEditingId(p.id);
+    setEditName(p.name);
+    setEditSourceIds(Array.isArray(p.source_ids) ? p.source_ids : []);
+  };
+  const cancel = () => setEditingId(null);
+
+  const toggleSource = (id) => {
+    setEditSourceIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  const save = async () => {
+    if (!editName.trim()) { showToast('Name is required'); return; }
+    setSaving(true);
+    try {
+      if (editingId === 'new') {
+        await api.createPersona({ name: editName.trim(), sourceIds: editSourceIds });
+        showToast(`Created "${editName.trim()}"`);
+      } else {
+        await api.updatePersona(editingId, { name: editName.trim(), sourceIds: editSourceIds });
+        showToast('Saved');
+      }
+      setEditingId(null);
+      reload();
+    } catch (err) {
+      showToast(err.message || 'Save failed');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const remove = async (p) => {
+    if (!window.confirm(`Delete "${p.name}"? Digests run under this persona will no longer be accessible.`)) return;
+    try {
+      await api.deletePersona(p.id);
+      showToast(`Deleted "${p.name}"`);
+      if (editingId === p.id) setEditingId(null);
+      reload();
+    } catch (err) {
+      showToast(err.message || 'Delete failed');
+    }
+  };
+
+  if (!personas) return <LoadingShell />;
+
+  const typeLabel = { reddit: 'Reddit', rss: 'RSS', html: 'HTML', tiktok: 'TikTok', 'spotify-playlist': 'Spotify', tokchart: 'Tokchart', youtube: 'YouTube' };
+  const grouped = {};
+  for (const s of sources) {
+    const g = s.type; if (!grouped[g]) grouped[g] = []; grouped[g].push(s);
+  }
+
+  const renderEditForm = (heading, isNew) => (
+    <div className="persona-edit-form">
+      <div className="persona-edit-heading">{heading}</div>
+      <input
+        className="persona-name-input"
+        placeholder="Persona name"
+        value={editName}
+        onChange={e => setEditName(e.target.value)}
+        onKeyDown={e => e.key === 'Enter' && save()}
+        autoFocus
+      />
+      <div className="persona-source-label">Sources</div>
+      <div className="persona-source-list">
+        {Object.entries(grouped).map(([type, ss]) => (
+          <div key={type} className="persona-source-group">
+            <div className="persona-source-type">{typeLabel[type] || type}</div>
+            {ss.map(s => (
+              <label key={s.id} className="persona-source-row">
+                <input
+                  type="checkbox"
+                  checked={editSourceIds.includes(s.id)}
+                  onChange={() => toggleSource(s.id)}
+                />
+                <span>{s.name}</span>
+              </label>
+            ))}
+          </div>
+        ))}
+      </div>
+      <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+        <button className="btn-save" onClick={save} disabled={saving}>
+          {saving ? 'Saving…' : isNew ? 'Create' : 'Save'}
+        </button>
+        <button className="btn-cancel" onClick={cancel}>Cancel</button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="section fade-in" style={{ paddingBottom: 80 }}>
+      <div className="section-head">
+        <div>
+          <div className="section-eyebrow">Profiles</div>
+          <h2 className="section-title">Personas</h2>
+        </div>
+        <button
+          className="run-btn"
+          style={{ fontSize: 13, padding: '8px 16px' }}
+          onClick={startNew}
+        >
+          + New Persona
+        </button>
+      </div>
+
+      {editingId === 'new' && renderEditForm('New Persona', true)}
+
+      <div className="persona-list-full">
+        {personas.map(p => (
+          <div key={p.id} className="persona-card">
+            {editingId === p.id ? renderEditForm(null, false) : (
+              <div className="persona-card-row">
+                <div className="persona-card-info">
+                  <div className="persona-card-name">{p.name}</div>
+                  <div className="persona-card-meta">
+                    {p.is_default
+                      ? 'All sources'
+                      : `${Array.isArray(p.source_ids) ? p.source_ids.length : 0} source${(Array.isArray(p.source_ids) ? p.source_ids.length : 0) !== 1 ? 's' : ''}`}
+                    {p.is_default && <span className="persona-default-badge">Default</span>}
+                  </div>
+                </div>
+                <div className="persona-card-actions">
+                  {!p.is_default && (
+                    <>
+                      <button className="btn-text-sm" onClick={() => startEdit(p)}>Edit</button>
+                      <button className="btn-text-sm btn-text-danger" onClick={() => remove(p)}>Delete</button>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {onDone && (
+        <button className="btn-cancel" style={{ marginTop: 24 }} onClick={onDone}>
+          Done
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ─── Loading Shell ─────────────────────────────────────────────
 
 export function LoadingShell() {
