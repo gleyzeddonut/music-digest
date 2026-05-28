@@ -12,6 +12,25 @@ const configStore = process.versions.electron
 
 const router = express.Router();
 
+// ── Active persona helper ─────────────────────────────────────
+// Returns the active persona ID, falling back to the built-in All Sources
+// persona. Never hardcodes 1 — autoincrement IDs are not guaranteed.
+function getActivePersonaId() {
+  const db = getDb();
+  const stored = db.prepare("SELECT value FROM settings WHERE key = 'active_persona_id'").get()?.value;
+  if (stored) {
+    const id = parseInt(stored, 10);
+    if (!isNaN(id) && db.prepare('SELECT id FROM personas WHERE id = ?').get(id)) return id;
+  }
+  return db.prepare('SELECT id FROM personas WHERE is_default = 1').get()?.id ?? null;
+}
+
+// Attach the active persona ID to every request.
+router.use((req, res, next) => {
+  try { req.activePersonaId = getActivePersonaId(); } catch (_) { req.activePersonaId = null; }
+  next();
+});
+
 // Persists user-supplied setup values to all three stores so the current
 // session, DB scheduler, and next app launch all see the new values.
 function persistSetupConfig(digestTo, claudeApiKey, userName) {
@@ -143,6 +162,9 @@ router.delete('/auth/spotify', (req, res) => {
   del('spotify_refresh_token');
   del('spotify_token_expires_at');
   del('spotify_playlist_id');
+  // Clean per-persona playlist keys
+  db.prepare("DELETE FROM settings WHERE key LIKE 'spotify_playlist_id_%'").run();
+  db.prepare("DELETE FROM settings WHERE key LIKE 'spotify_playlist_name_%'").run();
   db.prepare('DELETE FROM playlist_tracks').run();
   res.json({ ok: true });
 });
@@ -157,6 +179,84 @@ router.get('/api/spotify/token', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// ── Personas API ──────────────────────────────────────────────
+
+router.get('/api/personas', (req, res) => {
+  const personas = getDb().prepare('SELECT * FROM personas ORDER BY is_default DESC, id ASC').all();
+  res.json(personas.map(p => ({ ...p, source_ids: safeJson(p.source_ids, []) })));
+});
+
+router.get('/api/personas/active', (req, res) => {
+  const db = getDb();
+  const id = req.activePersonaId;
+  if (!id) return res.status(404).json({ error: 'No active persona' });
+  const persona = db.prepare('SELECT * FROM personas WHERE id = ?').get(id);
+  if (!persona) return res.status(404).json({ error: 'Persona not found' });
+  res.json({ ...persona, source_ids: safeJson(persona.source_ids, []) });
+});
+
+router.post('/api/personas/active', (req, res) => {
+  const db = getDb();
+  const id = parseInt(req.body?.id, 10);
+  if (!id || isNaN(id)) return res.status(400).json({ error: 'id required' });
+  if (!db.prepare('SELECT id FROM personas WHERE id = ?').get(id)) return res.status(404).json({ error: 'Persona not found' });
+  db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('active_persona_id', ?)").run(String(id));
+  res.json({ ok: true });
+});
+
+router.post('/api/personas', (req, res) => {
+  const { name, sourceIds = [] } = req.body || {};
+  if (!name || !name.trim()) return res.status(400).json({ error: 'name required' });
+  if (!Array.isArray(sourceIds)) return res.status(400).json({ error: 'sourceIds must be an array' });
+  const validIds = sourceIds.filter(n => Number.isInteger(n) && n > 0);
+  try {
+    const result = getDb().prepare(
+      "INSERT INTO personas (name, source_ids) VALUES (?, ?)"
+    ).run(name.trim(), JSON.stringify(validIds));
+    res.json({ id: result.lastInsertRowid, name: name.trim(), source_ids: validIds, is_default: 0 });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.patch('/api/personas/:id', (req, res) => {
+  const db = getDb();
+  const id = parseInt(req.params.id, 10);
+  const persona = db.prepare('SELECT * FROM personas WHERE id = ?').get(id);
+  if (!persona) return res.status(404).json({ error: 'Persona not found' });
+  const { name, sourceIds } = req.body || {};
+  if (name !== undefined) db.prepare('UPDATE personas SET name = ? WHERE id = ?').run(name.trim(), id);
+  if (sourceIds !== undefined) {
+    if (!Array.isArray(sourceIds)) return res.status(400).json({ error: 'sourceIds must be an array' });
+    const validIds = sourceIds.filter(n => Number.isInteger(n) && n > 0);
+    db.prepare('UPDATE personas SET source_ids = ? WHERE id = ?').run(JSON.stringify(validIds), id);
+  }
+  res.json({ ok: true });
+});
+
+router.delete('/api/personas/:id', (req, res) => {
+  const db = getDb();
+  const id = parseInt(req.params.id, 10);
+  const persona = db.prepare('SELECT * FROM personas WHERE id = ?').get(id);
+  if (!persona) return res.status(404).json({ error: 'Persona not found' });
+  if (persona.is_default) return res.status(400).json({ error: 'Cannot delete the built-in All Sources persona' });
+
+  db.transaction(() => {
+    // Clean up per-persona Spotify settings keys
+    db.prepare("DELETE FROM settings WHERE key = ?").run(`spotify_playlist_id_${id}`);
+    db.prepare("DELETE FROM settings WHERE key = ?").run(`spotify_playlist_name_${id}`);
+    // If this persona is active, switch back to the default
+    const active = db.prepare("SELECT value FROM settings WHERE key = 'active_persona_id'").get()?.value;
+    if (active && parseInt(active, 10) === id) {
+      const defaultId = db.prepare('SELECT id FROM personas WHERE is_default = 1').get()?.id;
+      if (defaultId) db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('active_persona_id', ?)").run(String(defaultId));
+    }
+    db.prepare('DELETE FROM personas WHERE id = ?').run(id);
+  })();
+
+  res.json({ ok: true });
 });
 
 // ── Digest API ────────────────────────────────────────────────

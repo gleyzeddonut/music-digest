@@ -44,6 +44,13 @@ export const api = {
   spotifyToken:            () => j('/api/spotify/token'),
   saveSpotifyPlaylistName: (name) => j('/api/settings/spotify-playlist-name', { method: 'POST', body: JSON.stringify({ name }) }),
   monthly:   (year, month) => j(`/api/monthly/${year}/${month}`),
+
+  personas:       ()         => j('/api/personas'),
+  activePersona:  ()         => j('/api/personas/active'),
+  setActivePersona: (id)     => j('/api/personas/active', { method: 'POST', body: JSON.stringify({ id }) }),
+  createPersona:  (body)     => j('/api/personas', { method: 'POST', body: JSON.stringify(body) }),
+  updatePersona:  (id, body) => j(`/api/personas/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  deletePersona:  (id)       => j(`/api/personas/${id}`, { method: 'DELETE' }),
 };
 
 export function bgFromName(name = '') {
