@@ -23,7 +23,7 @@ export const api = {
   digestByDate:  (date)     => j(`/api/digests/${date}`),
   deleteDigests: (dates)    => j('/api/digests', { method: 'DELETE', body: JSON.stringify({ dates }) }),
   resendDigest:  (date)     => j(`/api/digests/${date}/resend`, { method: 'POST' }),
-  runDigest:     (force)    => j('/api/run', { method: 'POST', body: JSON.stringify({ force }) }),
+  runDigest:     (force, personaId) => j('/api/run', { method: 'POST', body: JSON.stringify({ force, personaId }) }),
   runStream:     ()         => new EventSource(BASE + '/api/run/stream'),
 
   sources:       ()         => j('/api/sources'),
@@ -44,6 +44,13 @@ export const api = {
   spotifyToken:            () => j('/api/spotify/token'),
   saveSpotifyPlaylistName: (name) => j('/api/settings/spotify-playlist-name', { method: 'POST', body: JSON.stringify({ name }) }),
   monthly:   (year, month) => j(`/api/monthly/${year}/${month}`),
+
+  personas:       ()         => j('/api/personas'),
+  activePersona:  ()         => j('/api/personas/active'),
+  setActivePersona: (id)     => j('/api/personas/active', { method: 'POST', body: JSON.stringify({ id }) }),
+  createPersona:  (body)     => j('/api/personas', { method: 'POST', body: JSON.stringify(body) }),
+  updatePersona:  (id, body) => j(`/api/personas/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  deletePersona:  (id)       => j(`/api/personas/${id}`, { method: 'DELETE' }),
 };
 
 export function bgFromName(name = '') {

@@ -12,6 +12,45 @@ const configStore = process.versions.electron
 
 const router = express.Router();
 
+// ── Active persona helper ─────────────────────────────────────
+// Returns the active persona ID, falling back to the built-in All Sources
+// persona. Never hardcodes 1 — autoincrement IDs are not guaranteed.
+function getActivePersonaId() {
+  const db = getDb();
+  const stored = db.prepare("SELECT value FROM settings WHERE key = 'active_persona_id'").get()?.value;
+  if (stored) {
+    const id = parseInt(stored, 10);
+    if (!isNaN(id) && db.prepare('SELECT id FROM personas WHERE id = ?').get(id)) return id;
+  }
+  return db.prepare('SELECT id FROM personas WHERE is_default = 1').get()?.id ?? null;
+}
+
+// Attach the active persona ID (and isDefault flag) to every request.
+router.use((req, res, next) => {
+  try {
+    const id = getActivePersonaId();
+    req.activePersonaId = id;
+    req.activePersonaIsDefault = id
+      ? !!getDb().prepare('SELECT is_default FROM personas WHERE id = ?').get(id)?.is_default
+      : true;
+  } catch (_) {
+    req.activePersonaId = null;
+    req.activePersonaIsDefault = true;
+  }
+  next();
+});
+
+// Returns [whereClause, paramsArray] for filtering digests/tracks by active persona.
+// All Sources persona also surfaces legacy rows (persona_id IS NULL).
+// If activePersonaId is null (DB failure at middleware time), show all rows rather than silently filtering to nothing.
+function personaWhere(req, col = 'persona_id') {
+  if (req.activePersonaIsDefault) {
+    if (!req.activePersonaId) return ['1=1', []];
+    return [`(${col} = ? OR ${col} IS NULL)`, [req.activePersonaId]];
+  }
+  return [`${col} = ?`, [req.activePersonaId]];
+}
+
 // Persists user-supplied setup values to all three stores so the current
 // session, DB scheduler, and next app launch all see the new values.
 function persistSetupConfig(digestTo, claudeApiKey, userName) {
@@ -143,6 +182,10 @@ router.delete('/auth/spotify', (req, res) => {
   del('spotify_refresh_token');
   del('spotify_token_expires_at');
   del('spotify_playlist_id');
+  // Clean per-persona playlist keys and dedup history
+  db.prepare("DELETE FROM settings WHERE key LIKE 'spotify_playlist_id_%'").run();
+  db.prepare("DELETE FROM settings WHERE key LIKE 'spotify_playlist_name_%'").run();
+  // OAuth is shared — disconnect clears all personas' dedup state so reconnect starts fresh
   db.prepare('DELETE FROM playlist_tracks').run();
   res.json({ ok: true });
 });
@@ -159,33 +202,120 @@ router.get('/api/spotify/token', async (req, res) => {
   }
 });
 
+// ── Personas API ──────────────────────────────────────────────
+
+router.get('/api/personas', (req, res) => {
+  const personas = getDb().prepare('SELECT * FROM personas ORDER BY is_default DESC, id ASC').all();
+  res.json(personas.map(p => ({ ...p, source_ids: safeJson(p.source_ids, []) })));
+});
+
+router.get('/api/personas/active', (req, res) => {
+  const db = getDb();
+  const id = req.activePersonaId;
+  if (!id) return res.status(404).json({ error: 'No active persona' });
+  const persona = db.prepare('SELECT * FROM personas WHERE id = ?').get(id);
+  if (!persona) return res.status(404).json({ error: 'Persona not found' });
+  res.json({ ...persona, source_ids: safeJson(persona.source_ids, []) });
+});
+
+router.post('/api/personas/active', (req, res) => {
+  const db = getDb();
+  const id = parseInt(req.body?.id, 10);
+  if (!id || isNaN(id)) return res.status(400).json({ error: 'id required' });
+  if (!db.prepare('SELECT id FROM personas WHERE id = ?').get(id)) return res.status(404).json({ error: 'Persona not found' });
+  db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('active_persona_id', ?)").run(String(id));
+  res.json({ ok: true });
+});
+
+router.post('/api/personas', (req, res) => {
+  const { name, sourceIds = [] } = req.body || {};
+  if (!name || !name.trim()) return res.status(400).json({ error: 'name required' });
+  if (!Array.isArray(sourceIds)) return res.status(400).json({ error: 'sourceIds must be an array' });
+  const validIds = sourceIds.filter(n => Number.isInteger(n) && n > 0);
+  try {
+    const result = getDb().prepare(
+      "INSERT INTO personas (name, source_ids) VALUES (?, ?)"
+    ).run(name.trim(), JSON.stringify(validIds));
+    res.json({ id: result.lastInsertRowid, name: name.trim(), source_ids: validIds, is_default: 0 });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.patch('/api/personas/:id', (req, res) => {
+  const db = getDb();
+  const id = parseInt(req.params.id, 10);
+  const persona = db.prepare('SELECT * FROM personas WHERE id = ?').get(id);
+  if (!persona) return res.status(404).json({ error: 'Persona not found' });
+  const { name, sourceIds, includeInEmail } = req.body || {};
+  // Validate before any writes
+  if (name !== undefined && typeof name !== 'string') return res.status(400).json({ error: 'name must be a string' });
+  if (sourceIds !== undefined && !Array.isArray(sourceIds)) return res.status(400).json({ error: 'sourceIds must be an array' });
+  db.transaction(() => {
+    if (name !== undefined) db.prepare('UPDATE personas SET name = ? WHERE id = ?').run(name.trim(), id);
+    if (includeInEmail !== undefined) db.prepare('UPDATE personas SET include_in_email = ? WHERE id = ?').run(includeInEmail ? 1 : 0, id);
+    if (sourceIds !== undefined) {
+      const validIds = sourceIds.filter(n => Number.isInteger(n) && n > 0);
+      db.prepare('UPDATE personas SET source_ids = ? WHERE id = ?').run(JSON.stringify(validIds), id);
+    }
+  })();
+  res.json({ ok: true });
+});
+
+router.delete('/api/personas/:id', (req, res) => {
+  const db = getDb();
+  const id = parseInt(req.params.id, 10);
+  const persona = db.prepare('SELECT * FROM personas WHERE id = ?').get(id);
+  if (!persona) return res.status(404).json({ error: 'Persona not found' });
+  if (persona.is_default) return res.status(400).json({ error: 'Cannot delete the built-in Main persona' });
+
+  db.transaction(() => {
+    db.prepare('DELETE FROM digests WHERE persona_id = ?').run(id);
+    db.prepare('DELETE FROM playlist_tracks WHERE persona_id = ?').run(id);
+    db.prepare("DELETE FROM settings WHERE key = ?").run(`spotify_playlist_id_${id}`);
+    db.prepare("DELETE FROM settings WHERE key = ?").run(`spotify_playlist_name_${id}`);
+    const active = db.prepare("SELECT value FROM settings WHERE key = 'active_persona_id'").get()?.value;
+    if (active && parseInt(active, 10) === id) {
+      const defaultId = db.prepare('SELECT id FROM personas WHERE is_default = 1').get()?.id;
+      if (defaultId) db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('active_persona_id', ?)").run(String(defaultId));
+    }
+    db.prepare('DELETE FROM personas WHERE id = ?').run(id);
+  })();
+
+  res.json({ ok: true });
+});
+
 // ── Digest API ────────────────────────────────────────────────
 
 router.get('/api/digest/latest', (req, res) => {
   const db = getDb();
-  const digest = db.prepare('SELECT * FROM digests ORDER BY date DESC LIMIT 1').get();
+  const [where, params] = personaWhere(req);
+  const digest = db.prepare(`SELECT * FROM digests WHERE ${where} ORDER BY date DESC LIMIT 1`).get(...params);
   if (!digest) return res.json(null);
   res.json(parseDigest(digest));
 });
 
 router.get('/api/digests/:date', (req, res) => {
-  const digest = getDb().prepare('SELECT * FROM digests WHERE date = ?').get(req.params.date);
+  const [where, params] = personaWhere(req);
+  const digest = getDb().prepare(`SELECT * FROM digests WHERE date = ? AND ${where}`).get(req.params.date, ...params);
   if (!digest) return res.status(404).json({ error: 'Not found' });
   res.json(parseDigest(digest));
 });
 
 router.post('/api/digests/:date/resend', async (req, res) => {
   const db = getDb();
-  const row = db.prepare('SELECT * FROM digests WHERE date = ?').get(req.params.date);
+  const [where, params] = personaWhere(req);
+  const row = db.prepare(`SELECT * FROM digests WHERE date = ? AND ${where}`).get(req.params.date, ...params);
   if (!row) return res.status(404).json({ error: 'Digest not found' });
 
   const to = db.prepare("SELECT value FROM settings WHERE key = 'digest_to'").get()?.value;
   if (!to) return res.status(400).json({ error: 'No recipient email configured — set one in Settings → Delivery' });
 
   const result = parseDigest(row);
+  const [trackWhere, trackParams] = personaWhere(req, 'pt.persona_id');
   const added = db.prepare(
-    'SELECT track_name AS title, artist_name AS artist, track_id AS id FROM playlist_tracks WHERE digest_date = ?'
-  ).all(req.params.date);
+    `SELECT pt.track_name AS title, pt.artist_name AS artist, pt.track_id AS id FROM playlist_tracks pt WHERE pt.digest_date = ? AND ${trackWhere}`
+  ).all(req.params.date, ...trackParams);
   const addedTitles = new Set(added.map(a => (a.title || '').toLowerCase()));
   const unmatched = result.songs.filter(s => !addedTitles.has((s.title || '').toLowerCase()));
 
@@ -202,8 +332,9 @@ router.get('/api/digests', (req, res) => {
   const page = parseInt(req.query.page || '1', 10);
   const limit = 20;
   const offset = (page - 1) * limit;
-  const digests = db.prepare('SELECT * FROM digests ORDER BY date DESC LIMIT ? OFFSET ?').all(limit, offset);
-  const total = db.prepare('SELECT COUNT(*) as n FROM digests').get().n;
+  const [where, params] = personaWhere(req);
+  const digests = db.prepare(`SELECT * FROM digests WHERE ${where} ORDER BY date DESC LIMIT ? OFFSET ?`).all(...params, limit, offset);
+  const total = db.prepare(`SELECT COUNT(*) as n FROM digests WHERE ${where}`).get(...params).n;
   res.json({ digests: digests.map(parseDigest), total, page });
 });
 
@@ -213,9 +344,10 @@ router.delete('/api/digests', (req, res) => {
     return res.status(400).json({ error: 'dates array required' });
   try {
     const db = getDb();
+    const [where, personaParams] = personaWhere(req);
     const ph = dates.map(() => '?').join(',');
-    db.prepare(`DELETE FROM digests WHERE date IN (${ph})`).run(dates);
-    res.json({ ok: true, deleted: dates.length });
+    const del = db.prepare(`DELETE FROM digests WHERE date IN (${ph}) AND ${where}`).run(...dates, ...personaParams);
+    res.json({ ok: true, deleted: del.changes });
   } catch (err) {
     console.error('[routes] DELETE /api/digests failed:', err.message);
     res.status(500).json({ error: err.message });
@@ -229,9 +361,10 @@ router.get('/api/monthly/:year/:month', (req, res) => {
   const label = new Date(parseInt(year, 10), parseInt(month, 10) - 1, 1)
     .toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
+  const [personaClause, personaParams] = personaWhere(req);
   const rows = db.prepare(
-    'SELECT date, artists, songs, headlines FROM digests WHERE date LIKE ? ORDER BY date ASC'
-  ).all(`${prefix}-%`);
+    `SELECT date, artists, songs, headlines FROM digests WHERE date LIKE ? AND ${personaClause} ORDER BY date ASC`
+  ).all(`${prefix}-%`, ...personaParams);
 
   if (rows.length === 0) {
     return res.json({ month: label, monthKey: prefix, digestCount: 0, headlineCount: 0, artists: [], songs: [] });
@@ -281,9 +414,10 @@ router.get('/api/monthly/:year/:month', (req, res) => {
 });
 
 router.get('/api/playlist_tracks', (req, res) => {
+  const [where, params] = personaWhere(req);
   const tracks = getDb()
-    .prepare('SELECT track_id AS spotify_id, track_name AS title, artist_name AS artist, added_at, digest_date FROM playlist_tracks ORDER BY added_at DESC')
-    .all();
+    .prepare(`SELECT track_id AS spotify_id, track_name AS title, artist_name AS artist, added_at, digest_date FROM playlist_tracks WHERE ${where} ORDER BY added_at DESC`)
+    .all(...params);
   res.json({ tracks });
 });
 
@@ -377,16 +511,32 @@ router.get('/api/settings', (req, res) => {
     timezone:        config.TIMEZONE,
     spotify: {
       connected: isConnected(),
-      playlistUrl: getPlaylistUrl(),
-      playlistName: db_get('spotify_playlist_name', '🎵 Music Digest'),
+      playlistUrl: getPlaylistUrl(req.activePersonaId),
+      playlistName: (req.activePersonaId
+        ? (db_get(`spotify_playlist_name_${req.activePersonaId}`, null) || db_get('spotify_playlist_name', '🎵 Music Digest'))
+        : db_get('spotify_playlist_name', '🎵 Music Digest')),
+      playlistNameIsPersona: !!(req.activePersonaId && db_get(`spotify_playlist_name_${req.activePersonaId}`, null)),
     },
   });
 });
 
 router.post('/api/settings/spotify-playlist-name', (req, res) => {
   const { name } = req.body;
-  if (!name || !name.trim()) return res.status(400).json({ error: 'Name required' });
-  getDb().prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('spotify_playlist_name', name.trim());
+  const db = getDb();
+  const personaId = req.activePersonaId;
+  const trimmed = name?.trim() ?? '';
+  if (personaId) {
+    if (trimmed) {
+      db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(`spotify_playlist_name_${personaId}`, trimmed);
+    } else {
+      // Clearing → remove persona override so it falls back to shared playlist
+      db.prepare("DELETE FROM settings WHERE key = ?").run(`spotify_playlist_name_${personaId}`);
+      db.prepare("DELETE FROM settings WHERE key = ?").run(`spotify_playlist_id_${personaId}`);
+    }
+  } else {
+    if (!trimmed) return res.status(400).json({ error: 'Name required' });
+    db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('spotify_playlist_name', trimmed);
+  }
   res.json({ ok: true });
 });
 
@@ -441,6 +591,11 @@ router.get('/api/run/stream', (req, res) => {
 router.post('/api/run', async (req, res) => {
   if (runInProgress) return res.status(409).json({ error: 'Run already in progress' });
   const { force } = req.body;
+  // Prefer personaId sent by the client (captured at click time) over the
+  // middleware-resolved one, which could reflect a race if the user switched
+  // personas between clicking Run and the request being processed.
+  const bodyPersonaId = req.body.personaId != null ? parseInt(req.body.personaId, 10) || null : null;
+  const runPersonaId = bodyPersonaId ?? req.activePersonaId;
   res.json({ ok: true });
 
   runInProgress = true;
@@ -454,7 +609,7 @@ router.post('/api/run', async (req, res) => {
   console.error = (...a) => { origError(...a); broadcastLog('error', a); };
 
   try {
-    await runDigest({ force: !!force });
+    await runDigest({ force: !!force, personaId: runPersonaId });
   } catch (err) {
     broadcastLog('error', ['[run] Error: ' + err.message]);
   } finally {
@@ -474,13 +629,26 @@ router.get('/api/status', (req, res) => {
   const lastDigest = db.prepare('SELECT date, created_at FROM digests ORDER BY date DESC LIMIT 1').get();
   const config = require('../config');
   const digestTo = db.prepare("SELECT value FROM settings WHERE key = 'digest_to'").get()?.value || '';
+  const personaId = req.activePersonaId;
+  const customPlaylistName = personaId
+    ? db.prepare("SELECT value FROM settings WHERE key = ?").get(`spotify_playlist_name_${personaId}`)?.value
+    : null;
+  const playlistName = customPlaylistName
+    || db.prepare("SELECT value FROM settings WHERE key = 'spotify_playlist_name'").get()?.value
+    || '🎵 Music Digest';
+
   res.json({
-    spotify: { connected: isConnected(), playlistUrl: getPlaylistUrl() },
+    spotify: {
+      connected: isConnected(),
+      playlistUrl: getPlaylistUrl(req.activePersonaId),
+      playlistName,
+      playlistNameIsPersona: !!customPlaylistName,
+    },
     lastDigest: lastDigest || null,
     sendTime: config.SEND_TIME,
     timezone: config.TIMEZONE,
     sourcesCount: db.prepare('SELECT COUNT(*) as n FROM sources WHERE enabled = 1').get().n,
-    tracksInPlaylist: db.prepare('SELECT COUNT(*) as n FROM playlist_tracks').get().n,
+    tracksInPlaylist: (() => { const [w, p] = personaWhere(req); return db.prepare(`SELECT COUNT(*) as n FROM playlist_tracks WHERE ${w}`).get(...p).n; })(),
     userName: db.prepare("SELECT value FROM settings WHERE key = 'user_name'").get()?.value || '',
     configured: !!digestTo,
   });

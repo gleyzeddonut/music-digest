@@ -204,4 +204,61 @@ async function verifySmtp() {
   }
 }
 
-module.exports = { sendDigestEmail, verifySmtp };
+// Sends one email combining all persona digests that ran today.
+// entries: [{ persona, result: { artists, songs, headlines, summary }, playlistUrl, added, unmatched }]
+async function sendCombinedDigestEmail(entries) {
+  const to = getDigestTo();
+  if (!to) { console.warn('[email] No recipient configured — skipping email'); return false; }
+  if (!entries.length) return false;
+
+  const date = entries[0].result.date || new Date().toISOString().slice(0, 10);
+  const isMulti = entries.length > 1;
+
+  // Subject: top artists across all personas
+  const allArtists = entries.flatMap(e => (e.result.artists || []).slice(0, 2).map(a => a.name));
+  const uniqueArtists = [...new Set(allArtists)].slice(0, 3);
+  const extra = allArtists.length > 3 ? ` + more` : '';
+  const subject = `Music Digest — ${formatDate(date)}${uniqueArtists.length ? `: ${uniqueArtists.join(', ')}${extra}` : ''}`;
+
+  let html;
+  if (!isMulti) {
+    const { result, playlistUrl, added = [], unmatched = [] } = entries[0];
+    html = buildHtml(date, result, playlistUrl, added, unmatched);
+  } else {
+    // Build a section per persona, separated by a divider
+    const sections = entries.map(({ persona, result, playlistUrl, added = [], unmatched = [] }) => {
+      const inner = buildHtml(date, result, playlistUrl, added, unmatched);
+      // Extract body content (between <body> tags if present, else use full html)
+      const bodyMatch = inner.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+      const content = bodyMatch ? bodyMatch[1] : inner;
+      return `
+        <div style="margin-bottom:40px">
+          <div style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#888;margin-bottom:16px;padding-bottom:8px;border-bottom:1px solid #2a2a2a">${persona.name}</div>
+          ${content}
+        </div>`;
+    }).join('<div style="height:1px;background:#1a1a1a;margin:0 0 40px"></div>');
+
+    html = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="background:#111;color:#fff;font-family:-apple-system,sans-serif;padding:24px;max-width:680px;margin:0 auto">${sections}</body></html>`;
+  }
+
+  try {
+    await sendViaSupabase(to, subject, html);
+    console.log(`[email] Combined digest sent to ${to} via Supabase`);
+    return true;
+  } catch (err) {
+    console.warn('[email] Supabase send failed, trying local SMTP:', err.message);
+  }
+
+  const smtp = getSmtpConfig();
+  if (!smtp.user || !smtp.pass) { console.warn('[email] No local SMTP credentials — email not sent'); return false; }
+  try {
+    await createTransport().sendMail({ from: config.DIGEST_FROM || smtp.user, to, subject, html });
+    console.log(`[email] Combined digest sent to ${to} via local SMTP`);
+    return true;
+  } catch (err) {
+    console.error('[email] Failed to send:', err.message);
+    return false;
+  }
+}
+
+module.exports = { sendDigestEmail, sendCombinedDigestEmail, verifySmtp };

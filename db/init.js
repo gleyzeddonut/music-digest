@@ -56,12 +56,37 @@ function initDb() {
 
   const NEW_TYPES = "'reddit','rss','html','tiktok','spotify-playlist','tokchart','youtube'";
 
-  // Migration: extend sources type constraint whenever a new type is added
+  // ── Personas table — must exist before any migration that assigns persona IDs ──
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS personas (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      name        TEXT NOT NULL,
+      source_ids  TEXT NOT NULL DEFAULT '[]',
+      is_default  INTEGER NOT NULL DEFAULT 0,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `);
+
+  // ── Migration: add include_in_email column ───────────────────────────────────
+  const personasCols = db.prepare("PRAGMA table_info(personas)").all().map(c => c.name);
+  if (!personasCols.includes('include_in_email')) {
+    db.exec("ALTER TABLE personas ADD COLUMN include_in_email INTEGER NOT NULL DEFAULT 1");
+    console.log('[db] Added include_in_email column to personas');
+  }
+
+  // ── Seed All Sources persona ──────────────────────────────────────────────────
+  if (db.prepare('SELECT COUNT(*) as n FROM personas').get().n === 0) {
+    db.prepare("INSERT INTO personas (name, source_ids, is_default) VALUES ('Main', '[]', 1)").run();
+    console.log('[db] Seeded All Sources persona');
+  }
+  const allSourcesId = db.prepare('SELECT id FROM personas WHERE is_default = 1').get()?.id;
+
+  // ── Migration: sources type constraint ───────────────────────────────────────
   const tableInfo = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='sources'").get();
-  const needsMigration = tableInfo && (
+  const needsSourcesMigration = tableInfo && (
     !tableInfo.sql.includes("'tiktok'") || !tableInfo.sql.includes("'spotify-playlist'") || !tableInfo.sql.includes("'tokchart'") || !tableInfo.sql.includes("'youtube'")
   );
-  if (needsMigration) {
+  if (needsSourcesMigration) {
     db.transaction(() => {
       db.exec(`ALTER TABLE sources RENAME TO _sources_old`);
       db.exec(`CREATE TABLE sources (
@@ -79,17 +104,81 @@ function initDb() {
     console.log('[db] Migrated sources: updated type constraint');
   }
 
-  // Migration: add mentioned_artists column to digests if missing
-  const digestsInfo = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='digests'").get();
-  if (digestsInfo && !digestsInfo.sql.includes('mentioned_artists')) {
+  // ── Migration: digests.mentioned_artists ─────────────────────────────────────
+  const digestsInfoV1 = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='digests'").get();
+  if (digestsInfoV1 && !digestsInfoV1.sql.includes('mentioned_artists')) {
     db.exec('ALTER TABLE digests ADD COLUMN mentioned_artists TEXT');
     console.log('[db] Migrated digests: added mentioned_artists column');
   }
 
+  // ── Migration: digests — add persona_id, replace inline UNIQUE(date) ─────────
+  // Guard checks the table DDL string (not sqlite_master index entries) because
+  // the existing constraint is inline: `date TEXT UNIQUE NOT NULL`.
+  const digestsInfoV2 = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='digests'").get();
+  if (digestsInfoV2 && !digestsInfoV2.sql.includes('persona_id')) {
+    db.transaction(() => {
+      db.exec(`ALTER TABLE digests RENAME TO _digests_old`);
+      db.exec(`
+        CREATE TABLE digests (
+          id                INTEGER PRIMARY KEY AUTOINCREMENT,
+          date              TEXT NOT NULL,
+          persona_id        INTEGER,
+          summary           TEXT,
+          artists           TEXT,
+          songs             TEXT,
+          headlines         TEXT,
+          playlist_url      TEXT,
+          mentioned_artists TEXT,
+          created_at        TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+      `);
+      // Existing rows get persona_id = NULL; they surface under All Sources via
+      // the OR persona_id IS NULL pattern used in query filters.
+      db.exec(`
+        INSERT INTO digests (id, date, persona_id, summary, artists, songs, headlines, playlist_url, mentioned_artists, created_at)
+        SELECT id, date, NULL, summary, artists, songs, headlines, playlist_url, mentioned_artists, created_at
+        FROM _digests_old
+      `);
+      db.exec(`DROP TABLE _digests_old`);
+    })();
+    console.log('[db] Migrated digests: added persona_id, removed inline UNIQUE(date)');
+  }
+
+  // ── Migration: playlist_tracks — composite PK (track_id, persona_id) ─────────
+  // The old table has `track_id TEXT PRIMARY KEY`; the new one requires
+  // `PRIMARY KEY (track_id, persona_id)` so the same track can appear under
+  // multiple personas without dedup collisions across personas.
+  const tracksInfo = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='playlist_tracks'").get();
+  if (tracksInfo && !tracksInfo.sql.includes('persona_id')) {
+    db.transaction(() => {
+      db.exec(`ALTER TABLE playlist_tracks RENAME TO _playlist_tracks_old`);
+      db.exec(`
+        CREATE TABLE playlist_tracks (
+          track_id    TEXT NOT NULL,
+          persona_id  INTEGER NOT NULL,
+          track_name  TEXT,
+          artist_name TEXT,
+          added_at    TEXT NOT NULL DEFAULT (datetime('now')),
+          digest_date TEXT,
+          PRIMARY KEY (track_id, persona_id)
+        )
+      `);
+      // Existing tracks assigned to All Sources persona so dedup remains intact.
+      db.prepare(`
+        INSERT INTO playlist_tracks (track_id, persona_id, track_name, artist_name, added_at, digest_date)
+        SELECT track_id, ?, track_name, artist_name, added_at, digest_date
+        FROM _playlist_tracks_old
+      `).run(allSourcesId);
+      db.exec(`DROP TABLE _playlist_tracks_old`);
+    })();
+    console.log('[db] Migrated playlist_tracks: added persona_id (existing rows → All Sources), composite PK');
+  }
+
+  // ── Create remaining tables (no-ops for upgraded DBs) ────────────────────────
   db.exec(`
     CREATE TABLE IF NOT EXISTS sources (
       id        INTEGER PRIMARY KEY AUTOINCREMENT,
-      type      TEXT NOT NULL CHECK(type IN ('reddit','rss','html','tiktok','spotify-playlist','tokchart','youtube')),
+      type      TEXT NOT NULL CHECK(type IN (${NEW_TYPES})),
       name      TEXT NOT NULL,
       url       TEXT NOT NULL,
       selector  TEXT,
@@ -99,7 +188,8 @@ function initDb() {
 
     CREATE TABLE IF NOT EXISTS digests (
       id                INTEGER PRIMARY KEY AUTOINCREMENT,
-      date              TEXT UNIQUE NOT NULL,
+      date              TEXT NOT NULL,
+      persona_id        INTEGER,
       summary           TEXT,
       artists           TEXT,
       songs             TEXT,
@@ -110,11 +200,13 @@ function initDb() {
     );
 
     CREATE TABLE IF NOT EXISTS playlist_tracks (
-      track_id    TEXT PRIMARY KEY,
+      track_id    TEXT NOT NULL,
+      persona_id  INTEGER NOT NULL,
       track_name  TEXT,
       artist_name TEXT,
       added_at    TEXT NOT NULL DEFAULT (datetime('now')),
-      digest_date TEXT
+      digest_date TEXT,
+      PRIMARY KEY (track_id, persona_id)
     );
 
     CREATE TABLE IF NOT EXISTS settings (
@@ -129,7 +221,18 @@ function initDb() {
     );
   `);
 
-  // Seed default sources only if table is empty
+  // Unique index on (date, persona_id) — covers both fresh DBs and upgraded ones
+  db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_digests_date_persona ON digests(date, persona_id)`);
+
+  // ── Seed active_persona_id if not set ────────────────────────────────────────
+  if (!db.prepare("SELECT value FROM settings WHERE key = 'active_persona_id'").get()) {
+    const defaultId = db.prepare('SELECT id FROM personas WHERE is_default = 1').get()?.id;
+    if (defaultId) {
+      db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('active_persona_id', ?)").run(String(defaultId));
+    }
+  }
+
+  // ── Seed default sources if table is empty ────────────────────────────────────
   const count = db.prepare('SELECT COUNT(*) as n FROM sources').get().n;
   if (count === 0) {
     const insert = db.prepare(
