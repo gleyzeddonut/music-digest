@@ -1,5 +1,6 @@
 import React from 'react';
 import { api } from './api.js';
+import { getPersonaColor } from './personas.js';
 
 // ─── SVG Icon Library ─────────────────────────────────────────
 
@@ -105,7 +106,85 @@ function NavItem({ id, label, icon, route, onNavigate }) {
   );
 }
 
-function Sidebar({ route, onNavigate, spotifyConnected, personas = [], activePersonaId, onPersonaSwitch, onManagePersonas }) {
+function EqSwatch({ color, animate = false, sm = false }) {
+  return (
+    <span
+      className={`eq-swatch${animate ? ' animate' : ''}${sm ? ' sm' : ''}`}
+      style={{ '--p-accent': color.accent, '--p-accent2': color.accent2, '--p-glow': color.glow }}
+      aria-hidden="true"
+    >
+      <span className="bar" /><span className="bar" /><span className="bar" /><span className="bar" />
+    </span>
+  );
+}
+const _PChevron = () => (
+  <svg className="persona-trigger-chev" width="11" height="11" viewBox="0 0 12 12" fill="none">
+    <path d="M2.5 4L6 7.5L9.5 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+const _PCheck = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="20 6 9 17 4 12" />
+  </svg>
+);
+const _PPlus = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+    <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+  </svg>
+);
+const _PGear = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="3" />
+    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+  </svg>
+);
+const _PTrash = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6M14 11v6" />
+  </svg>
+);
+function _personaCount(p, totalSources) {
+  if (p.is_default) return totalSources ?? null;
+  return Array.isArray(p.source_ids) ? p.source_ids.length : null;
+}
+
+function Sidebar({ route, onNavigate, spotifyConnected, personas = [], activePersonaId, onPersonaSwitch, onManagePersonas, onDeletePersona, playlistName = '🎵 Music Digest', playlistNameIsPersona = false, onPlaylistNameSave, totalSources }) {
+  const [dropdownOpen, setDropdownOpen] = React.useState(false);
+  const [ctxMenu, setCtxMenu] = React.useState(null); // { x, y, persona }
+  const [localPlaylistName, setLocalPlaylistName] = React.useState(playlistName);
+  React.useEffect(() => setLocalPlaylistName(playlistName), [playlistName]);
+
+  const dropdownRef = React.useRef(null);
+  React.useEffect(() => {
+    if (!dropdownOpen && !ctxMenu) return;
+    const close = (e) => {
+      if (dropdownRef.current && dropdownRef.current.contains(e.target)) return;
+      setDropdownOpen(false);
+      setCtxMenu(null);
+    };
+    window.addEventListener('click', close);
+    window.addEventListener('contextmenu', close);
+    return () => { window.removeEventListener('click', close); window.removeEventListener('contextmenu', close); };
+  }, [dropdownOpen, ctxMenu]);
+
+  const handleItemContext = (e, p) => {
+    if (p.is_default) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setCtxMenu({ x: e.clientX, y: e.clientY, persona: p });
+  };
+
+  const handleDelete = () => {
+    const p = ctxMenu.persona;
+    setCtxMenu(null);
+    if (window.confirm(`Delete "${p.name}" and all its digests, playlist tracks, and data? This cannot be undone.`)) {
+      onDeletePersona(p.id);
+    }
+  };
+
+  const activePersona = personas.find(p => p.id === activePersonaId);
+  const activeColor = getPersonaColor(activePersona, personas);
+
   return (
     <aside className="sidebar">
       <div className="brand">
@@ -113,29 +192,61 @@ function Sidebar({ route, onNavigate, spotifyConnected, personas = [], activePer
         <span className="brand-name">Music <em>Digest</em></span>
       </div>
 
-      {personas.length > 0 && (
-        <div className="persona-switcher">
-          <div className="persona-list">
-            {personas.map(p => (
-              <button
-                key={p.id}
-                className={`persona-chip${p.id === activePersonaId ? ' active' : ''}`}
-                onClick={() => onPersonaSwitch(p.id)}
-                title={p.name}
-              >
-                {p.name}
-              </button>
-            ))}
-            <button
-              className="persona-chip persona-chip-add"
-              onClick={onManagePersonas}
-              title="Manage personas"
-            >
-              +
+      <div className="persona-switcher" ref={dropdownRef}>
+        <button
+          className={`persona-trigger${dropdownOpen ? ' is-open' : ''}`}
+          style={{ '--p-accent': activeColor.accent, '--p-accent2': activeColor.accent2, '--p-glow': activeColor.glow }}
+          onClick={() => setDropdownOpen(o => !o)}
+        >
+          <EqSwatch color={activeColor} animate />
+          <span className="persona-trigger-meta">
+            <span className="persona-trigger-name">{activePersona?.name ?? 'Main'}</span>
+            <span className="persona-trigger-sub">
+              <span className="live-dot" />
+              {(() => {
+                const c = _personaCount(activePersona ?? { is_default: true }, totalSources);
+                return c != null ? `${c} source${c === 1 ? '' : 's'}` : 'all sources';
+              })()}
+            </span>
+          </span>
+          <_PChevron />
+        </button>
+        {dropdownOpen && (
+          <div className="persona-menu">
+            <div className="persona-menu-label">Switch persona</div>
+            {personas.map((p, i) => {
+              const color = getPersonaColor(p, personas);
+              const isActive = p.id === activePersonaId;
+              const c = _personaCount(p, totalSources);
+              return (
+                <button
+                  key={p.id}
+                  className={`persona-item${isActive ? ' active' : ''}`}
+                  style={{ '--i-accent': color.accent, '--i-dim': color.dim, animationDelay: `${i * 32}ms` }}
+                  onClick={() => { onPersonaSwitch(p.id); setDropdownOpen(false); }}
+                  onContextMenu={(e) => handleItemContext(e, p)}
+                >
+                  <EqSwatch color={color} animate={isActive} sm />
+                  <span className="persona-item-meta">
+                    <span className="persona-item-name">{p.name}</span>
+                    <span className="persona-item-sub">
+                      {c != null ? `${c} source${c === 1 ? '' : 's'}` : 'all sources'}
+                    </span>
+                  </span>
+                  <span className="persona-item-check"><_PCheck /></span>
+                </button>
+              );
+            })}
+            <div className="persona-menu-divider" />
+            <button className="persona-foot new" onClick={() => { onManagePersonas(); setDropdownOpen(false); }}>
+              <span className="ico"><_PPlus /></span> New persona
+            </button>
+            <button className="persona-foot manage" onClick={() => { onManagePersonas(); setDropdownOpen(false); }}>
+              <span className="ico"><_PGear /></span> Manage personas
             </button>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       <div className="nav-group">
         <div className="nav-label">Daily</div>
@@ -161,14 +272,59 @@ function Sidebar({ route, onNavigate, spotifyConnected, personas = [], activePer
             <div className="state">Spotify</div>
           </div>
         </div>
+        {spotifyConnected && (() => {
+          const isPersonaMode = !!(activePersona && !activePersona.is_default);
+          return (
+            <div className="playlist-name-row">
+              <div className="playlist-name-label">
+                <span>Playlist</span>
+                {isPersonaMode && (
+                  <span className={`playlist-name-badge${playlistNameIsPersona ? ' custom' : ''}`}>
+                    {playlistNameIsPersona ? 'custom' : 'shared'}
+                  </span>
+                )}
+              </div>
+              <div className="playlist-name-field">
+                <input
+                  className={`playlist-name-input${playlistNameIsPersona ? ' is-persona' : ''}`}
+                  value={localPlaylistName}
+                  onChange={e => setLocalPlaylistName(e.target.value)}
+                  onFocus={e => e.target.select()}
+                  onBlur={() => {
+                    const trimmed = localPlaylistName.trim();
+                    if (trimmed !== playlistName) onPlaylistNameSave?.(trimmed);
+                    if (!trimmed && isPersonaMode) setLocalPlaylistName('');
+                  }}
+                  onKeyDown={e => e.key === 'Enter' && e.target.blur()}
+                  placeholder={isPersonaMode && !playlistNameIsPersona ? 'Using shared playlist' : '🎵 Music Digest'}
+                />
+                <svg className="playlist-edit-icon" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                </svg>
+              </div>
+            </div>
+          );
+        })()}
       </div>
+
+      {ctxMenu && (
+        <div
+          className="persona-ctx-menu"
+          style={{ top: ctxMenu.y, left: ctxMenu.x }}
+          onClick={e => e.stopPropagation()}
+        >
+          <button className="persona-ctx-item persona-ctx-delete" onClick={handleDelete}>
+            <_PTrash /> Delete "{ctxMenu.persona.name}" &amp; all data
+          </button>
+        </div>
+      )}
     </aside>
   );
 }
 
 // ─── Topbar ───────────────────────────────────────────────────
 
-function Topbar({ title, onRun, running, userName, userEmail, onNavigate, spotifyConnected, playlistUrl, onOpenLog, onSpotifyConnect }) {
+function Topbar({ title, onRun, running, runPhase, userName, userEmail, onNavigate, spotifyConnected, playlistUrl, onOpenLog, onSpotifyConnect }) {
   const [menuOpen, setMenuOpen] = React.useState(false);
   const initials = (userName || 'U').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
 
@@ -195,10 +351,12 @@ function Topbar({ title, onRun, running, userName, userEmail, onNavigate, spotif
         className="run-btn"
         onClick={onRun}
         disabled={running}
-        style={running ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+        style={running ? { opacity: 0.85, cursor: 'not-allowed', minWidth: 110 } : {}}
       >
-        <Icon name="run" size={13} />
-        {running ? 'Running…' : 'Run digest'}
+        {!running && <Icon name="run" size={13} />}
+        {running
+          ? <><span className="run-phase-text">{runPhase || 'Running'}</span><span className="run-dots" aria-hidden="true" /></>
+          : 'Run digest'}
       </button>
       <div className="avatar-wrap">
         <button

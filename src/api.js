@@ -23,7 +23,7 @@ export const api = {
   digestByDate:  (date)     => j(`/api/digests/${date}`),
   deleteDigests: (dates)    => j('/api/digests', { method: 'DELETE', body: JSON.stringify({ dates }) }),
   resendDigest:  (date)     => j(`/api/digests/${date}/resend`, { method: 'POST' }),
-  runDigest:     (force)    => j('/api/run', { method: 'POST', body: JSON.stringify({ force }) }),
+  runDigest:     (force, personaId) => j('/api/run', { method: 'POST', body: JSON.stringify({ force, personaId }) }),
   runStream:     ()         => new EventSource(BASE + '/api/run/stream'),
 
   sources:       ()         => j('/api/sources'),

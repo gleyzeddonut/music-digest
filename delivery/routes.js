@@ -247,12 +247,13 @@ router.patch('/api/personas/:id', (req, res) => {
   const id = parseInt(req.params.id, 10);
   const persona = db.prepare('SELECT * FROM personas WHERE id = ?').get(id);
   if (!persona) return res.status(404).json({ error: 'Persona not found' });
-  const { name, sourceIds } = req.body || {};
+  const { name, sourceIds, includeInEmail } = req.body || {};
   // Validate before any writes
   if (name !== undefined && typeof name !== 'string') return res.status(400).json({ error: 'name must be a string' });
   if (sourceIds !== undefined && !Array.isArray(sourceIds)) return res.status(400).json({ error: 'sourceIds must be an array' });
   db.transaction(() => {
     if (name !== undefined) db.prepare('UPDATE personas SET name = ? WHERE id = ?').run(name.trim(), id);
+    if (includeInEmail !== undefined) db.prepare('UPDATE personas SET include_in_email = ? WHERE id = ?').run(includeInEmail ? 1 : 0, id);
     if (sourceIds !== undefined) {
       const validIds = sourceIds.filter(n => Number.isInteger(n) && n > 0);
       db.prepare('UPDATE personas SET source_ids = ? WHERE id = ?').run(JSON.stringify(validIds), id);
@@ -266,13 +267,13 @@ router.delete('/api/personas/:id', (req, res) => {
   const id = parseInt(req.params.id, 10);
   const persona = db.prepare('SELECT * FROM personas WHERE id = ?').get(id);
   if (!persona) return res.status(404).json({ error: 'Persona not found' });
-  if (persona.is_default) return res.status(400).json({ error: 'Cannot delete the built-in All Sources persona' });
+  if (persona.is_default) return res.status(400).json({ error: 'Cannot delete the built-in Main persona' });
 
   db.transaction(() => {
-    // Clean up per-persona Spotify settings keys
+    db.prepare('DELETE FROM digests WHERE persona_id = ?').run(id);
+    db.prepare('DELETE FROM playlist_tracks WHERE persona_id = ?').run(id);
     db.prepare("DELETE FROM settings WHERE key = ?").run(`spotify_playlist_id_${id}`);
     db.prepare("DELETE FROM settings WHERE key = ?").run(`spotify_playlist_name_${id}`);
-    // If this persona is active, switch back to the default
     const active = db.prepare("SELECT value FROM settings WHERE key = 'active_persona_id'").get()?.value;
     if (active && parseInt(active, 10) === id) {
       const defaultId = db.prepare('SELECT id FROM personas WHERE is_default = 1').get()?.id;
@@ -345,8 +346,8 @@ router.delete('/api/digests', (req, res) => {
     const db = getDb();
     const [where, personaParams] = personaWhere(req);
     const ph = dates.map(() => '?').join(',');
-    db.prepare(`DELETE FROM digests WHERE date IN (${ph}) AND ${where}`).run(...dates, ...personaParams);
-    res.json({ ok: true, deleted: dates.length });
+    const del = db.prepare(`DELETE FROM digests WHERE date IN (${ph}) AND ${where}`).run(...dates, ...personaParams);
+    res.json({ ok: true, deleted: del.changes });
   } catch (err) {
     console.error('[routes] DELETE /api/digests failed:', err.message);
     res.status(500).json({ error: err.message });
@@ -511,15 +512,31 @@ router.get('/api/settings', (req, res) => {
     spotify: {
       connected: isConnected(),
       playlistUrl: getPlaylistUrl(req.activePersonaId),
-      playlistName: db_get('spotify_playlist_name', '🎵 Music Digest'),
+      playlistName: (req.activePersonaId
+        ? (db_get(`spotify_playlist_name_${req.activePersonaId}`, null) || db_get('spotify_playlist_name', '🎵 Music Digest'))
+        : db_get('spotify_playlist_name', '🎵 Music Digest')),
+      playlistNameIsPersona: !!(req.activePersonaId && db_get(`spotify_playlist_name_${req.activePersonaId}`, null)),
     },
   });
 });
 
 router.post('/api/settings/spotify-playlist-name', (req, res) => {
   const { name } = req.body;
-  if (!name || !name.trim()) return res.status(400).json({ error: 'Name required' });
-  getDb().prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('spotify_playlist_name', name.trim());
+  const db = getDb();
+  const personaId = req.activePersonaId;
+  const trimmed = name?.trim() ?? '';
+  if (personaId) {
+    if (trimmed) {
+      db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(`spotify_playlist_name_${personaId}`, trimmed);
+    } else {
+      // Clearing → remove persona override so it falls back to shared playlist
+      db.prepare("DELETE FROM settings WHERE key = ?").run(`spotify_playlist_name_${personaId}`);
+      db.prepare("DELETE FROM settings WHERE key = ?").run(`spotify_playlist_id_${personaId}`);
+    }
+  } else {
+    if (!trimmed) return res.status(400).json({ error: 'Name required' });
+    db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('spotify_playlist_name', trimmed);
+  }
   res.json({ ok: true });
 });
 
@@ -574,6 +591,11 @@ router.get('/api/run/stream', (req, res) => {
 router.post('/api/run', async (req, res) => {
   if (runInProgress) return res.status(409).json({ error: 'Run already in progress' });
   const { force } = req.body;
+  // Prefer personaId sent by the client (captured at click time) over the
+  // middleware-resolved one, which could reflect a race if the user switched
+  // personas between clicking Run and the request being processed.
+  const bodyPersonaId = req.body.personaId != null ? parseInt(req.body.personaId, 10) || null : null;
+  const runPersonaId = bodyPersonaId ?? req.activePersonaId;
   res.json({ ok: true });
 
   runInProgress = true;
@@ -587,7 +609,7 @@ router.post('/api/run', async (req, res) => {
   console.error = (...a) => { origError(...a); broadcastLog('error', a); };
 
   try {
-    await runDigest({ force: !!force, personaId: req.activePersonaId });
+    await runDigest({ force: !!force, personaId: runPersonaId });
   } catch (err) {
     broadcastLog('error', ['[run] Error: ' + err.message]);
   } finally {
@@ -607,8 +629,21 @@ router.get('/api/status', (req, res) => {
   const lastDigest = db.prepare('SELECT date, created_at FROM digests ORDER BY date DESC LIMIT 1').get();
   const config = require('../config');
   const digestTo = db.prepare("SELECT value FROM settings WHERE key = 'digest_to'").get()?.value || '';
+  const personaId = req.activePersonaId;
+  const customPlaylistName = personaId
+    ? db.prepare("SELECT value FROM settings WHERE key = ?").get(`spotify_playlist_name_${personaId}`)?.value
+    : null;
+  const playlistName = customPlaylistName
+    || db.prepare("SELECT value FROM settings WHERE key = 'spotify_playlist_name'").get()?.value
+    || '🎵 Music Digest';
+
   res.json({
-    spotify: { connected: isConnected(), playlistUrl: getPlaylistUrl(req.activePersonaId) },
+    spotify: {
+      connected: isConnected(),
+      playlistUrl: getPlaylistUrl(req.activePersonaId),
+      playlistName,
+      playlistNameIsPersona: !!customPlaylistName,
+    },
     lastDigest: lastDigest || null,
     sendTime: config.SEND_TIME,
     timezone: config.TIMEZONE,

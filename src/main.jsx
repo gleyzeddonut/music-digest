@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
 import { api, bgFromName, weekOfYear, msToMinSec } from './api.js';
+import { applyPersonaTheme } from './personas.js';
 import { Sidebar, Topbar, LogPanel, showToast } from './components.jsx';
 import {
   DigestScreen,
@@ -176,6 +177,7 @@ function App() {
   const [rawStatus, setRawStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
+  const [runPhase, setRunPhase] = useState('');
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [selectedArtist, setSelectedArtist] = useState(null);
   const [showLog, setShowLog] = useState(false);
@@ -183,6 +185,8 @@ function App() {
   const [settingsRefresh, setSettingsRefresh] = useState(0);
   const [personas, setPersonas] = useState([]);
   const [activePersonaId, setActivePersonaId] = useState(null);
+  const [playlistName, setPlaylistName] = useState('🎵 Music Digest');
+  const [playlistNameIsPersona, setPlaylistNameIsPersona] = useState(false);
 
   // ── Initial load ────────────────────────────────────────────────────────────
 
@@ -198,6 +202,10 @@ function App() {
       setRawStatus(status);
       setPersonas(personaList);
       if (activePersona) setActivePersonaId(activePersona.id);
+      if (status.spotify) {
+        setPlaylistName(status.spotify.playlistName || '🎵 Music Digest');
+        setPlaylistNameIsPersona(!!status.spotify.playlistNameIsPersona);
+      }
       if (digest) {
         setData(adaptDigest(digest, list, status));
       } else {
@@ -222,6 +230,15 @@ function App() {
   const handleRun = useCallback(async (force = false) => {
     if (running) return;
     setRunning(true);
+    setRunPhase('Starting');
+
+    const PHASE_LABELS = {
+      scraping: 'Scraping',
+      scoring:  'Scoring',
+      claude:   'Analyzing',
+      spotify:  'Playlist',
+      saving:   'Saving',
+    };
 
     let es;
     let finished = false;
@@ -230,19 +247,25 @@ function App() {
       finished = true;
       if (es) { es.onerror = null; es.close(); }
       if (msg) showToast(msg);
+      setRunPhase('');
       loadData();
       setRunning(false);
     };
 
     try {
-      await api.runDigest(force);
+      await api.runDigest(force, activePersonaId);
+      setRunPhase('Running');
       es = api.runStream();
 
-      // Backend sends plain `message` events with { level, msg } in data
       es.onmessage = (e) => {
         try {
-          const { level } = JSON.parse(e.data);
-          if (level === 'done') finish('Digest complete!');
+          const { level, msg } = JSON.parse(e.data);
+          if (level === 'done') { finish('Digest complete!'); return; }
+          const phaseMatch = msg?.match(/\[PHASE\]\s+(\w+)/i);
+          if (phaseMatch) {
+            const label = PHASE_LABELS[phaseMatch[1].toLowerCase()] || phaseMatch[1];
+            setRunPhase(label);
+          }
         } catch {}
       };
 
@@ -258,6 +281,12 @@ function App() {
     }
   }, [running, loadData]);
 
+  // ── Persona theme ───────────────────────────────────────────────
+  useEffect(() => {
+    const active = personas.find(p => p.id === activePersonaId);
+    applyPersonaTheme(active ?? null, personas);
+  }, [activePersonaId, personas]);
+
   // ── Persona switch ─────────────────────────────────────────────
 
   const handlePersonaSwitch = useCallback(async (id) => {
@@ -271,6 +300,32 @@ function App() {
       console.error('[App] persona switch failed:', err);
     }
   }, [activePersonaId, loadData]);
+
+  // ── Playlist name save ──────────────────────────────────────────────────────
+
+  const handlePlaylistNameSave = useCallback(async (name) => {
+    try {
+      await api.saveSpotifyPlaylistName(name);
+      loadData();
+    } catch (err) {
+      console.error('[App] playlist name save failed:', err);
+    }
+  }, [loadData]);
+
+  // ── Persona delete ──────────────────────────────────────────────────────────
+
+  const handleDeletePersona = useCallback(async (id) => {
+    try {
+      await api.deletePersona(id);
+      if (id === activePersonaId) {
+        const def = personas.find(p => p.is_default);
+        if (def) { await api.setActivePersona(def.id); setActivePersonaId(def.id); }
+      }
+      loadData();
+    } catch (err) {
+      console.error('[App] persona delete failed:', err);
+    }
+  }, [activePersonaId, personas, loadData]);
 
   // ── Spotify connect ─────────────────────────────────────────────────────────
 
@@ -376,13 +431,15 @@ function App() {
       screen = <HistoryScreen onViewDigest={handleViewDigest} onDelete={loadData} />;
       break;
     case 'sources':
-      screen = <SourcesScreen />;
+      screen = <SourcesScreen activePersonaId={activePersonaId} personas={personas} onPersonaSourcesChanged={loadData} />;
       break;
     case 'settings':
       screen = (
         <SettingsScreen
           onSpotifyConnect={handleSpotifyConnect}
           refreshTrigger={settingsRefresh}
+          activePersonaId={activePersonaId}
+          personas={personas}
         />
       );
       break;
@@ -408,7 +465,11 @@ function App() {
       screen = <PlaylistScreen status={rawStatus} />;
       break;
     case 'personas':
-      screen = <PersonaEditorScreen onDone={() => { loadData(); navigate('digest'); }} />;
+      screen = <PersonaEditorScreen
+        onDone={() => { loadData(); navigate('digest'); }}
+        onRefresh={loadData}
+        onSwitchPersona={(id) => { handlePersonaSwitch(id); navigate('digest'); }}
+      />;
       break;
     case 'digest':
     default:
@@ -450,12 +511,18 @@ function App() {
         activePersonaId={activePersonaId}
         onPersonaSwitch={handlePersonaSwitch}
         onManagePersonas={() => navigate('personas')}
+        onDeletePersona={handleDeletePersona}
+        totalSources={rawStatus?.sourcesCount ?? null}
+        playlistName={playlistName}
+        playlistNameIsPersona={playlistNameIsPersona}
+        onPlaylistNameSave={handlePlaylistNameSave}
       />
       <div className="main-col">
         <Topbar
           title={topTitle}
           onRun={() => handleRun(true)}
           running={running}
+          runPhase={runPhase}
           userName={userName}
           userEmail={userEmail}
           onNavigate={navigate}

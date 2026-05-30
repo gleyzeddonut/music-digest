@@ -70,13 +70,22 @@ function startServer() {
         lastScheduledRun = todayKey;
         console.log(`\n[${now.toISOString()}] ── Scheduled digest run starting ──`);
         try {
-          const storedPersonaId = getSetting('active_persona_id', null);
-          const personaId = storedPersonaId ? parseInt(storedPersonaId, 10) || null : null;
-          const result = await runDigest({ sendEmail: true, personaId });
-          if (result.skipped) {
-            console.log(`[digest] Already ran today, skipped`);
-          } else {
-            console.log(`[digest] Done. Artists: ${result.artists?.length}, Songs: ${result.songs?.length}, Email: ${result.emailSent}`);
+          const { getDb } = require('./db/init');
+          const personas = getDb().prepare('SELECT * FROM personas WHERE include_in_email = 1 ORDER BY is_default DESC, id').all();
+          const results = [];
+          for (const persona of personas) {
+            try {
+              const result = await runDigest({ sendEmail: false, personaId: persona.id });
+              if (!result.skipped) results.push({ persona, result });
+              else console.log(`[digest] ${persona.name}: already ran today, skipped`);
+            } catch (err) {
+              console.error(`[digest] ${persona.name} failed:`, err.message);
+            }
+          }
+          if (results.length > 0) {
+            const { sendCombinedDigestEmail } = require('./delivery/email');
+            const sent = await sendCombinedDigestEmail(results);
+            console.log(`[digest] Combined email sent: ${sent}. Personas: ${results.map(r => r.persona.name).join(', ')}`);
           }
         } catch (err) {
           console.error(`[digest] Run failed:`, err.message);

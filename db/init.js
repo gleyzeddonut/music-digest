@@ -67,9 +67,16 @@ function initDb() {
     )
   `);
 
+  // ── Migration: add include_in_email column ───────────────────────────────────
+  const personasCols = db.prepare("PRAGMA table_info(personas)").all().map(c => c.name);
+  if (!personasCols.includes('include_in_email')) {
+    db.exec("ALTER TABLE personas ADD COLUMN include_in_email INTEGER NOT NULL DEFAULT 1");
+    console.log('[db] Added include_in_email column to personas');
+  }
+
   // ── Seed All Sources persona ──────────────────────────────────────────────────
   if (db.prepare('SELECT COUNT(*) as n FROM personas').get().n === 0) {
-    db.prepare("INSERT INTO personas (name, source_ids, is_default) VALUES ('All Sources', '[]', 1)").run();
+    db.prepare("INSERT INTO personas (name, source_ids, is_default) VALUES ('Main', '[]', 1)").run();
     console.log('[db] Seeded All Sources persona');
   }
   const allSourcesId = db.prepare('SELECT id FROM personas WHERE is_default = 1').get()?.id;

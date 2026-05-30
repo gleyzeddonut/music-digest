@@ -89,15 +89,18 @@ function spotifyApi(token) {
 // ── Playlist management ───────────────────────────────────────
 
 async function getOrCreatePlaylist(api, personaId) {
-  const idKey   = `spotify_playlist_id_${personaId}`;
-  const nameKey = `spotify_playlist_name_${personaId}`;
+  // Only use a per-persona playlist when the persona has a custom name set.
+  // Otherwise fall back to the shared default playlist so all personas contribute
+  // to the same playlist by default.
+  const customName = personaId ? getSetting(`spotify_playlist_name_${personaId}`) : null;
+  const useShared  = !personaId || !customName;
 
-  // Derive default name from persona, e.g. "Indie World · Music Digest"
-  const persona = personaId ? getDb().prepare('SELECT name FROM personas WHERE id = ?').get(personaId) : null;
-  const defaultName = persona?.name ? `${persona.name} · Music Digest` : DEFAULT_PLAYLIST_NAME;
+  const idKey  = useShared ? 'spotify_playlist_id' : `spotify_playlist_id_${personaId}`;
+  const name   = useShared
+    ? (getSetting('spotify_playlist_name') || DEFAULT_PLAYLIST_NAME)
+    : customName;
 
   const existingId = getSetting(idKey);
-  const name = getSetting(nameKey) || defaultName;
   const { data: me } = await api.get('/me');
 
   if (existingId) {
@@ -125,7 +128,11 @@ async function getOrCreatePlaylist(api, personaId) {
 
   setSetting(idKey, playlist.id);
   // New playlist — local dedup records for this persona are now stale
-  getDb().prepare('DELETE FROM playlist_tracks WHERE persona_id = ?').run(personaId);
+  if (personaId != null) {
+    getDb().prepare('DELETE FROM playlist_tracks WHERE persona_id = ?').run(personaId);
+  } else {
+    getDb().prepare('DELETE FROM playlist_tracks WHERE persona_id IS NULL').run();
+  }
   console.log(`[spotify] Created playlist "${name}": ${playlist.external_urls.spotify}`);
   return playlist.id;
 }
@@ -216,8 +223,9 @@ function isConnected() {
 }
 
 function getPlaylistUrl(personaId) {
-  const id = personaId
-    ? getSetting(`spotify_playlist_id_${personaId}`)
+  const customName = personaId ? getSetting(`spotify_playlist_name_${personaId}`) : null;
+  const id = (personaId && customName)
+    ? (getSetting(`spotify_playlist_id_${personaId}`) || getSetting('spotify_playlist_id'))
     : getSetting('spotify_playlist_id');
   return id ? `https://open.spotify.com/playlist/${id}` : null;
 }

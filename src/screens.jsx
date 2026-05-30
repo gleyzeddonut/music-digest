@@ -1,6 +1,7 @@
 import React from 'react';
 import { Icon, CoverArt, Greeting, showToast } from './components.jsx';
 import { api, bgFromName } from './api.js';
+import { getPersonaColor } from './personas.js';
 
 // ─── DigestScreen ─────────────────────────────────────────────
 
@@ -419,27 +420,45 @@ export function HistoryScreen({ onViewDigest, onDelete }) {
 
 // ─── SourcesScreen ────────────────────────────────────────────
 
-export function SourcesScreen() {
+export function SourcesScreen({ activePersonaId, personas = [], onPersonaSourcesChanged }) {
   const [sources, setSources] = React.useState(null);
   const [newType, setNewType] = React.useState('reddit');
   const [newName, setNewName] = React.useState('');
   const [newUrl, setNewUrl] = React.useState('');
   const [newSel, setNewSel] = React.useState('');
   const [testing, setTesting] = React.useState({});
+  const [personaSourceIds, setPersonaSourceIds] = React.useState(null);
 
   const TYPE_LABELS = { reddit: 'Reddit', rss: 'RSS', html: 'HTML', tiktok: 'TikTok', 'spotify-playlist': 'Spotify', tokchart: 'Tokchart', youtube: 'YouTube' };
   const URL_LABEL = { reddit: 'Subreddit slug', rss: 'Feed URL', html: 'Page URL', tiktok: 'Identifier', 'spotify-playlist': 'Playlist URL or ID', youtube: 'Chart URL' };
   const URL_PH = { reddit: 'indieheads', rss: 'https://…/feed', html: 'https://…', tiktok: 'tiktok://trending', 'spotify-playlist': 'https://open.spotify.com/playlist/…', youtube: 'https://charts.youtube.com/charts/TrendingVideos/us/RightNow' };
 
+  const activePersona = personas.find(p => p.id === activePersonaId);
+  const isPersonaMode = !!(activePersona && !activePersona.is_default);
+
   React.useEffect(() => {
     api.sources().then(setSources).catch(() => setSources([]));
   }, []);
 
+  React.useEffect(() => {
+    setPersonaSourceIds(
+      isPersonaMode ? new Set(activePersona.source_ids || []) : null
+    );
+  }, [activePersonaId, isPersonaMode]);
+
   const reload = () => api.sources().then(setSources);
 
   const toggle = async (id, enabled) => {
-    await api.patchSource(id, { enabled: !enabled });
-    reload();
+    if (isPersonaMode) {
+      const next = new Set(personaSourceIds);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      setPersonaSourceIds(next);
+      await api.updatePersona(activePersonaId, { sourceIds: [...next] });
+      onPersonaSourcesChanged?.();
+    } else {
+      await api.patchSource(id, { enabled: !enabled });
+      reload();
+    }
   };
 
   const remove = async (id) => {
@@ -467,10 +486,14 @@ export function SourcesScreen() {
       const m = url.match(/playlist\/([A-Za-z0-9]+)/);
       if (m) url = m[1];
     }
-    await api.addSource({ type: newType, name: newName, url, selector: newSel || undefined });
-    showToast(`Added ${newName}`);
-    setNewName(''); setNewUrl(''); setNewSel('');
-    reload();
+    try {
+      await api.addSource({ type: newType, name: newName, url, selector: newSel || undefined });
+      showToast(`Added ${newName}`);
+      setNewName(''); setNewUrl(''); setNewSel('');
+      reload();
+    } catch (err) {
+      showToast(err.message || 'Failed to add source');
+    }
   };
 
   const grouped = { reddit: [], rss: [], html: [], tiktok: [], 'spotify-playlist': [], tokchart: [], youtube: [] };
@@ -539,9 +562,9 @@ export function SourcesScreen() {
             {items.map(s => (
               <div key={s.id} className="src-row">
                 <button
-                  className={`toggle${s.enabled ? ' on' : ''}`}
+                  className={`toggle${(isPersonaMode ? personaSourceIds?.has(s.id) : s.enabled) ? ' on' : ''}`}
                   onClick={() => toggle(s.id, s.enabled)}
-                  title={s.enabled ? 'Disable' : 'Enable'}
+                  title={isPersonaMode ? (personaSourceIds?.has(s.id) ? 'Remove from persona' : 'Add to persona') : (s.enabled ? 'Disable' : 'Enable')}
                 />
                 <div className="nm">
                   {s.name}
@@ -576,18 +599,79 @@ export function SourcesScreen() {
 const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0';
 let _updateCheckCache = null; // fetch once per session, not per mount
 
-export function SettingsScreen({ onSpotifyConnect, refreshTrigger = 0 }) {
+function PersonasEmailRow({ personas, inputStyle }) {
+  const [open, setOpen] = React.useState(false);
+  const [overrides, setOverrides] = React.useState({});
+  const containerRef = React.useRef(null);
+
+  React.useEffect(() => {
+    if (!open) return;
+    const close = (e) => {
+      if (containerRef.current && containerRef.current.contains(e.target)) return;
+      setOpen(false);
+    };
+    window.addEventListener('click', close);
+    return () => window.removeEventListener('click', close);
+  }, [open]);
+
+  const isChecked = (p) =>
+    p.id in overrides ? overrides[p.id] : p.include_in_email !== 0;
+
+  const toggle = async (p) => {
+    const next = !isChecked(p);
+    setOverrides(prev => ({ ...prev, [p.id]: next }));
+    try {
+      await api.updatePersona(p.id, { includeInEmail: next });
+    } catch (err) {
+      setOverrides(prev => ({ ...prev, [p.id]: !next })); // roll back on failure
+      showToast(err.message || 'Failed to update');
+    }
+  };
+
+  const enabled = personas.filter(p => isChecked(p)).length;
+
+  return (
+    <SettingRow label="Personas in email">
+      <div ref={containerRef} style={{ position: 'relative' }}>
+        <button
+          style={{ ...inputStyle, cursor: 'pointer', color: 'var(--text-2)', display: 'flex', alignItems: 'center', gap: 6 }}
+          onClick={() => setOpen(o => !o)}
+        >
+          <span>{enabled} of {personas.length} active</span>
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ opacity: 0.5, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}>
+            <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </button>
+        {open && (
+          <div className="email-persona-popout">
+            {personas.map(p => (
+              <div key={p.id} className="email-persona-row" onClick={() => toggle(p)}>
+                <span className={`toggle${isChecked(p) ? ' on' : ''}`} style={{ flexShrink: 0 }} />
+                <span className="email-persona-dot" style={{ background: getPersonaColor(p, personas).accent }} />
+                {p.name}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </SettingRow>
+  );
+}
+
+export function SettingsScreen({ onSpotifyConnect, refreshTrigger = 0, activePersonaId, personas = [] }) {
   const [settings, setSettings] = React.useState(null);
   const [status, setStatus] = React.useState(null);
   const [isElectron, setIsElectron] = React.useState(false);
   const [disconnecting, setDisconnecting] = React.useState(false);
   const [playlistName, setPlaylistName] = React.useState('🎵 Music Digest');
+  const [playlistNameIsPersona, setPlaylistNameIsPersona] = React.useState(false);
   const [latestRelease, setLatestRelease] = React.useState(null); // { version, url } | null
 
   const reload = () => Promise.all([api.settings(), api.status()]).then(([s, st]) => {
     setSettings(s);
     setStatus(st);
     setPlaylistName(st?.spotify?.playlistName || s?.spotify?.playlistName || '🎵 Music Digest');
+    setPlaylistNameIsPersona(!!(st?.spotify?.playlistNameIsPersona || s?.spotify?.playlistNameIsPersona));
   });
 
   React.useEffect(() => {
@@ -676,7 +760,13 @@ export function SettingsScreen({ onSpotifyConnect, refreshTrigger = 0 }) {
           <SettingRow label="Enabled">
             <Toggle
               on={schedEnabled}
-              onChange={v => save({ enabled: v })}
+              onChange={v => {
+                setSettings(s => ({ ...s, scheduleEnabled: v }));
+                api.saveSchedule({ ...settings, enabled: v }).catch(() => {
+                  setSettings(s => ({ ...s, scheduleEnabled: !v }));
+                  showToast('Failed to save');
+                });
+              }}
             />
           </SettingRow>
           <SettingRow label="Frequency">
@@ -725,6 +815,9 @@ export function SettingsScreen({ onSpotifyConnect, refreshTrigger = 0 }) {
       <div style={gridRow}>
         {sectionLabel('Delivery', 'Where to send your daily brief.')}
         <div className="set-card">
+            {personas.filter(p => !p.is_default).length > 0 && (
+            <PersonasEmailRow personas={personas} inputStyle={inputStyle} />
+          )}
           <SettingRow label="Send digest to">
             <input
               type="email"
@@ -757,23 +850,39 @@ export function SettingsScreen({ onSpotifyConnect, refreshTrigger = 0 }) {
       <div style={gridRow}>
         {sectionLabel('Spotify', 'Connect to build a playlist of every song from your digests.')}
         <div className="set-card">
-          <SettingRow label="Playlist name">
-            <input
-              type="text"
-              value={playlistName}
-              onChange={e => setPlaylistName(e.target.value)}
-              onBlur={async e => {
-                const val = e.target.value.trim();
-                if (!val) return;
-                try {
-                  await api.saveSpotifyPlaylistName(val);
-                  showToast(spotify.connected && spotify.playlistUrl ? 'Playlist will be renamed on next digest run' : 'Name saved');
-                } catch { showToast('Failed to save name'); }
-              }}
-              placeholder="e.g. My Music Digest"
-              style={{ ...inputStyle, width: 220 }}
-            />
-          </SettingRow>
+          {(() => {
+            const activePersona = personas.find(p => p.id === activePersonaId);
+            const isPersonaMode = !!(activePersona && !activePersona.is_default);
+            return (
+              <SettingRow label="Playlist name">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  <input
+                    type="text"
+                    value={playlistName}
+                    onChange={e => setPlaylistName(e.target.value)}
+                    onBlur={async e => {
+                      const val = e.target.value.trim();
+                      if (!isPersonaMode && !val) return;
+                      try {
+                        await api.saveSpotifyPlaylistName(val);
+                        setPlaylistNameIsPersona(isPersonaMode && !!val);
+                        showToast(!val ? 'Reverted to shared playlist' : spotify.connected && spotify.playlistUrl ? 'Playlist will be renamed on next digest run' : 'Name saved');
+                      } catch { showToast('Failed to save name'); }
+                    }}
+                    placeholder={isPersonaMode && !playlistNameIsPersona ? 'Shared (🎵 Music Digest)' : 'e.g. My Music Digest'}
+                    style={{ ...inputStyle, width: 220 }}
+                  />
+                  {isPersonaMode && (
+                    <span style={{ fontSize: 11, color: 'var(--text-3)', lineHeight: 1.4 }}>
+                      {playlistNameIsPersona
+                        ? <>Custom for <strong style={{ color: 'var(--accent)' }}>{activePersona.name}</strong> — clear &amp; blur to use shared playlist</>
+                        : <>Using shared playlist — enter a name to give <strong style={{ color: 'var(--accent)' }}>{activePersona.name}</strong> its own</>}
+                    </span>
+                  )}
+                </div>
+              </SettingRow>
+            );
+          })()}
           {spotify.connected ? (
             <>
               <SettingRow label="Status">
@@ -1458,7 +1567,7 @@ export function MonthlyScreen({ data }) {
 
 // ─── PersonaEditorScreen ──────────────────────────────────────
 
-export function PersonaEditorScreen({ onDone }) {
+export function PersonaEditorScreen({ onDone, onRefresh, onSwitchPersona }) {
   const [personas, setPersonas] = React.useState(null);
   const [sources, setSources] = React.useState([]);
   const [editingId, setEditingId] = React.useState(null); // persona id being edited, or 'new'
@@ -1496,6 +1605,7 @@ export function PersonaEditorScreen({ onDone }) {
       }
       setEditingId(null);
       reload();
+      onRefresh?.();
     } catch (err) {
       showToast(err.message || 'Save failed');
     } finally {
@@ -1510,6 +1620,7 @@ export function PersonaEditorScreen({ onDone }) {
       showToast(`Deleted "${p.name}"`);
       if (editingId === p.id) setEditingId(null);
       reload();
+      onRefresh?.();
     } catch (err) {
       showToast(err.message || 'Delete failed');
     }
@@ -1581,14 +1692,19 @@ export function PersonaEditorScreen({ onDone }) {
 
       <div className="persona-list-full">
         {personas.map(p => (
-          <div key={p.id} className="persona-card">
+          <div key={p.id} className="persona-card" style={(() => { const c = getPersonaColor(p, personas); return { '--pc-accent': c.accent, '--pc-glow': c.glow }; })()}>
             {editingId === p.id ? renderEditForm(null, false) : (
               <div className="persona-card-row">
-                <div className="persona-card-info">
+                <div
+                  className="persona-card-info"
+                  style={onSwitchPersona ? { cursor: 'pointer' } : undefined}
+                  onClick={onSwitchPersona ? () => onSwitchPersona(p.id) : undefined}
+                  title={onSwitchPersona ? `Switch to ${p.name}` : undefined}
+                >
                   <div className="persona-card-name">{p.name}</div>
                   <div className="persona-card-meta">
                     {p.is_default
-                      ? 'All sources'
+                      ? 'Main persona'
                       : `${Array.isArray(p.source_ids) ? p.source_ids.length : 0} source${(Array.isArray(p.source_ids) ? p.source_ids.length : 0) !== 1 ? 's' : ''}`}
                     {p.is_default && <span className="persona-default-badge">Default</span>}
                   </div>
