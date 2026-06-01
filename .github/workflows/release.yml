@@ -9,11 +9,8 @@ name: Release
 # `python2`, that step fails. CI pins a compatible Python so the DMG always
 # builds the same way.
 #
-# One-time setup (repo → Settings → Secrets and variables → Actions):
-#   APP_ENV — the full contents of your local .env (SMTP creds, etc.).
-#             The .env is gitignored but is bundled into the app via
-#             electron-builder `extraResources`, so the build needs it present.
-#   GITHUB_TOKEN is provided automatically — no setup needed.
+# No secrets to configure: all app credentials live in Supabase edge functions,
+# and GITHUB_TOKEN (used to publish the release) is provided automatically.
 
 on:
   push:
@@ -42,9 +39,6 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-
-      - name: Restore bundled .env from secret
-        run: printf '%s' "${{ secrets.APP_ENV }}" > .env
 
       - name: Build renderer
         run: npm run build:ui

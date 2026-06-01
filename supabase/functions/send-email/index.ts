@@ -1,10 +1,18 @@
-import { SmtpClient } from 'https://deno.land/x/smtp@v0.7.0/mod.ts'
+import nodemailer from 'npm:nodemailer@6.9.16'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Sends a digest email via SMTP (Gmail by default). Credentials live only in
+// this function's Supabase secrets — never in the shipped client app.
+//   SMTP_HOST (default smtp.gmail.com), SMTP_PORT (default 465),
+//   SMTP_USER, SMTP_PASS (Gmail App Password), SMTP_FROM (defaults to SMTP_USER)
+//
+// Uses npm:nodemailer because the deno.land SMTP libs are incompatible with the
+// Supabase edge runtime: smtp@0.7.0 calls the removed `Deno.writeAll`, and
+// denomailer crashes the worker at boot.
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
 
@@ -17,25 +25,22 @@ Deno.serve(async (req) => {
       })
     }
 
-    const client = new SmtpClient()
-    await client.connectTLS({
-      hostname: Deno.env.get('SMTP_HOST') ?? 'smtp.gmail.com',
-      port: Number(Deno.env.get('SMTP_PORT') ?? 465),
-      username: Deno.env.get('SMTP_USER') ?? '',
-      password: Deno.env.get('SMTP_PASS') ?? '',
+    const user = Deno.env.get('SMTP_USER') ?? ''
+    const port = Number(Deno.env.get('SMTP_PORT') ?? 465)
+
+    const transporter = nodemailer.createTransport({
+      host: Deno.env.get('SMTP_HOST') ?? 'smtp.gmail.com',
+      port,
+      secure: port === 465, // implicit TLS on 465, STARTTLS on 587
+      auth: { user, pass: Deno.env.get('SMTP_PASS') ?? '' },
     })
 
-    try {
-      await client.send({
-        from: Deno.env.get('SMTP_FROM') ?? Deno.env.get('SMTP_USER') ?? '',
-        to,
-        subject,
-        content: 'This digest requires an HTML-capable email client.',
-        html,
-      })
-    } finally {
-      await client.close().catch(() => {})
-    }
+    await transporter.sendMail({
+      from: Deno.env.get('SMTP_FROM') || user,
+      to,
+      subject,
+      html,
+    })
 
     return new Response(JSON.stringify({ ok: true }), {
       headers: { ...CORS, 'Content-Type': 'application/json' },

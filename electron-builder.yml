@@ -36,12 +36,9 @@ dmg:
       type: file
       path: build/README.rtf
 
-# Bundle the .env so Electron can load shared credentials at runtime.
-# This file is in .gitignore — you must have it locally to build.
-extraResources:
-  - from: ".env"
-    to: ".env"
-
+# NOTE: .env is intentionally NOT bundled. All credentials (email/SMTP, API
+# keys) live server-side in Supabase edge functions; the app only carries the
+# public Supabase publishable key. Email is sent via the `send-email` function.
 files:
   - "**/*"
   - "!docs/**"
