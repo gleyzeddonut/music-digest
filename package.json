@@ -1,6 +1,6 @@
 {
   "name": "music-digest",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "Daily music buzz digest — scrape, summarize, playlist, deliver",
   "repository": {
     "type": "git",
