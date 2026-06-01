@@ -74,7 +74,7 @@ function buildHtml(date, result, playlistUrl, added, unmatched) {
       </div>`
     : '';
 
-  const summaryParagraphs = summary.split('\n\n').map(p =>
+  const summaryParagraphs = (summary || '').split('\n\n').map(p =>
     `<p style="color:#333;line-height:1.7;margin:0 0 14px;">${escHtml(p)}</p>`
   ).join('');
 
@@ -233,12 +233,12 @@ async function sendCombinedDigestEmail(entries) {
       const content = bodyMatch ? bodyMatch[1] : inner;
       return `
         <div style="margin-bottom:40px">
-          <div style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#888;margin-bottom:16px;padding-bottom:8px;border-bottom:1px solid #2a2a2a">${persona.name}</div>
+          <div style="max-width:600px;margin:0 auto;font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#e76f51;padding:0 20px 8px;border-bottom:1px solid #eee">${escHtml(persona.name)}</div>
           ${content}
         </div>`;
-    }).join('<div style="height:1px;background:#1a1a1a;margin:0 0 40px"></div>');
+    }).join('<div style="max-width:600px;margin:0 auto;height:1px;background:#eee"></div>');
 
-    html = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="background:#111;color:#fff;font-family:-apple-system,sans-serif;padding:24px;max-width:680px;margin:0 auto">${sections}</body></html>`;
+    html = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="background:#ffffff;color:#111;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;padding:24px 0;margin:0">${sections}</body></html>`;
   }
 
   try {

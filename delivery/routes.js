@@ -431,7 +431,7 @@ router.get('/api/sources', (req, res) => {
 router.post('/api/sources', (req, res) => {
   const { type, name, url, selector } = req.body;
   if (!type || !name || !url) return res.status(400).json({ error: 'type, name, url required' });
-  if (!['reddit', 'rss', 'html', 'tiktok', 'spotify-playlist', 'tokchart'].includes(type)) return res.status(400).json({ error: 'Invalid source type' });
+  if (!['reddit', 'rss', 'html', 'tiktok', 'spotify-playlist', 'tokchart', 'youtube'].includes(type)) return res.status(400).json({ error: 'Invalid source type' });
 
   try {
     const result = getDb().prepare(

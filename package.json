@@ -2,6 +2,10 @@
   "name": "music-digest",
   "version": "1.4.0",
   "description": "Daily music buzz digest — scrape, summarize, playlist, deliver",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gleyzeddonut/music-digest.git"
+  },
   "main": "electron/main.js",
   "scripts": {
     "dev:ui": "vite",

@@ -88,7 +88,7 @@ function createWindow() {
     mainWindow.loadURL('http://localhost:5173');
     mainWindow.webContents.openDevTools({ mode: 'detach' });
   } else {
-    mainWindow.loadURL('http://localhost:3000');
+    mainWindow.loadURL(`http://localhost:${require('../config').PORT}`);
   }
 
   // Hide instead of close so the scheduler keeps running

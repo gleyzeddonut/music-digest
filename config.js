@@ -9,7 +9,7 @@ if (process.versions.electron) {
 }
 
 module.exports = {
-  SPOTIFY_REDIRECT_URI: process.env.SPOTIFY_REDIRECT_URI || 'http://127.0.0.1:3000/auth/spotify/callback',
+  SPOTIFY_REDIRECT_URI: process.env.SPOTIFY_REDIRECT_URI || `http://127.0.0.1:${parseInt(process.env.PORT || '3001', 10)}/auth/spotify/callback`,
   SMTP_HOST:   process.env.SMTP_HOST || 'smtp.gmail.com',
   SMTP_PORT:   parseInt(process.env.SMTP_PORT || '587', 10),
   SMTP_USER:   process.env.SMTP_USER || '',

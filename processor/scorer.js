@@ -226,6 +226,10 @@ function calcChartScore(entity) {
   if (entity.chartPositions.spotify != null) {
     score += 0.10 * (1 - (entity.chartPositions.spotify - 1) / 199);
   }
+  // YouTube Trending Music — mainstream video consumption signal
+  if (entity.chartPositions.youtube != null) {
+    score += 0.12 * Math.max(0, 1 - (entity.chartPositions.youtube - 1) / 49);
+  }
   return Math.min(1, score);
 }
 

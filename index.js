@@ -38,19 +38,58 @@ function parseSendTime(timeStr) {
   return { hour: h || 8, minute: m || 0 };
 }
 
-function shouldSendToday(now) {
+// Wall-clock parts (hour/minute/weekday/day-of-month/date key) for the configured
+// timezone, so the schedule fires at the user's intended local time regardless of
+// the host machine's system timezone. Falls back to system local time if the
+// configured zone string is invalid.
+function zonedParts(tz) {
+  try {
+    const parts = Object.fromEntries(
+      new Intl.DateTimeFormat('en-US', {
+        timeZone: tz,
+        weekday: 'short',
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', hour12: false,
+      }).formatToParts(new Date()).map(p => [p.type, p.value])
+    );
+    let hour = parseInt(parts.hour, 10);
+    if (hour === 24) hour = 0; // some ICU builds emit '24' at midnight
+    const weekdays = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+    return {
+      hour,
+      minute: parseInt(parts.minute, 10),
+      weekday: weekdays[parts.weekday],
+      dayOfMonth: parseInt(parts.day, 10),
+      dateKey: `${parts.year}-${parts.month}-${parts.day}`,
+    };
+  } catch {
+    const now = new Date();
+    return {
+      hour: now.getHours(), minute: now.getMinutes(),
+      weekday: now.getDay(), dayOfMonth: now.getDate(),
+      dateKey: now.toISOString().split('T')[0],
+    };
+  }
+}
+
+function shouldSendToday(parts) {
   const frequency = getSetting('schedule_frequency', 'daily');
-  if (frequency === 'daily') return true;
   if (frequency === 'weekly') {
     const target = parseInt(getSetting('schedule_week_day', '5'), 10);
-    return now.getDay() === target;
+    return parts.weekday === target;
   }
   if (frequency === 'monthly') {
     const target = parseInt(getSetting('schedule_month_date', '1'), 10);
-    return now.getDate() === target;
+    return parts.dayOfMonth === target;
   }
-  return true;
+  return true; // daily
 }
+
+// Catch-up window: if the exact send minute is missed (system sleep, event-loop
+// stalls, clock drift), still fire as long as we're within this many minutes past
+// the target and haven't already run today. runDigest dedups per date+persona, so
+// a late fire never double-sends.
+const SCHEDULE_CATCHUP_MIN = 60;
 
 function startServer() {
   return new Promise((resolve, reject) => {
@@ -59,16 +98,19 @@ function startServer() {
     let lastScheduledRun = null;
 
     setInterval(async () => {
+      if (getSetting('schedule_enabled', '1') === '0') return;
       const sendTime = getSetting('schedule_send_time', config.SEND_TIME);
       const { hour, minute } = parseSendTime(sendTime);
-      const now = new Date();
-      const todayKey = now.toISOString().split('T')[0];
+      const parts = zonedParts(config.TIMEZONE);
 
-      if (now.getHours() === hour && now.getMinutes() === minute && lastScheduledRun !== todayKey) {
-        if (getSetting('schedule_enabled', '1') === '0') return;
-        if (!shouldSendToday(now)) return;
-        lastScheduledRun = todayKey;
-        console.log(`\n[${now.toISOString()}] ── Scheduled digest run starting ──`);
+      const targetMin = hour * 60 + minute;
+      const nowMin = parts.hour * 60 + parts.minute;
+      const withinWindow = nowMin >= targetMin && (nowMin - targetMin) <= SCHEDULE_CATCHUP_MIN;
+
+      if (withinWindow && lastScheduledRun !== parts.dateKey) {
+        if (!shouldSendToday(parts)) return;
+        lastScheduledRun = parts.dateKey;
+        console.log(`\n[${new Date().toISOString()}] ── Scheduled digest run starting (${config.TIMEZONE} ${parts.dateKey} ${String(parts.hour).padStart(2,'0')}:${String(parts.minute).padStart(2,'0')}) ──`);
         try {
           const { getDb } = require('./db/init');
           const personas = getDb().prepare('SELECT * FROM personas WHERE include_in_email = 1 ORDER BY is_default DESC, id').all();
@@ -76,8 +118,9 @@ function startServer() {
           for (const persona of personas) {
             try {
               const result = await runDigest({ sendEmail: false, personaId: persona.id });
-              if (!result.skipped) results.push({ persona, result });
-              else console.log(`[digest] ${persona.name}: already ran today, skipped`);
+              if (result.skipped) console.log(`[digest] ${persona.name}: already ran today, skipped`);
+              else if (result.error) console.warn(`[digest] ${persona.name}: ${result.error}`);
+              else results.push({ persona, result });
             } catch (err) {
               console.error(`[digest] ${persona.name} failed:`, err.message);
             }

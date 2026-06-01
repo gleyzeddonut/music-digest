@@ -1,0 +1,55 @@
+name: Release
+
+# Builds the macOS DMG — the asset users download from GitHub Releases — on a
+# clean runner and uploads it to the matching release. Triggered by pushing a
+# version tag (e.g. v1.4.1) or manually from the Actions tab.
+#
+# Why this exists: electron-builder's DMG step runs a vendored `dmgbuild`
+# Python script. On a dev machine with only a very new Python (3.14) and no
+# `python2`, that step fails. CI pins a compatible Python so the DMG always
+# builds the same way.
+#
+# One-time setup (repo → Settings → Secrets and variables → Actions):
+#   APP_ENV — the full contents of your local .env (SMTP creds, etc.).
+#             The .env is gitignored but is bundled into the app via
+#             electron-builder `extraResources`, so the build needs it present.
+#   GITHUB_TOKEN is provided automatically — no setup needed.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # Pin a dmgbuild-compatible Python so the DMG packaging step is
+      # deterministic regardless of the runner's default Python version.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Restore bundled .env from secret
+        run: printf '%s' "${{ secrets.APP_ENV }}" > .env
+
+      - name: Build renderer
+        run: npm run build:ui
+
+      - name: Build & publish DMG to GitHub Releases
+        run: npx electron-builder --mac --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
