@@ -9,12 +9,17 @@ Deno.serve(async (req) => {
   if (limited) return limited
 
   try {
+    const params = await req.json().catch(() => ({}))
+    const rc = typeof params?.regionCode === 'string' && /^[A-Za-z]{2}$/.test(params.regionCode)
+      ? params.regionCode.toUpperCase()
+      : 'US'
+
     const key = Deno.env.get('YOUTUBE_API_KEY') ?? ''
     const url = new URL('https://www.googleapis.com/youtube/v3/videos')
     url.searchParams.set('part', 'snippet,statistics')
     url.searchParams.set('chart', 'mostPopular')
     url.searchParams.set('videoCategoryId', '10')
-    url.searchParams.set('regionCode', 'US')
+    url.searchParams.set('regionCode', rc)
     url.searchParams.set('maxResults', '50')
     url.searchParams.set('key', key)
 
