@@ -129,4 +129,65 @@ function parseChartRows(data, chartType, label) {
   }).filter((r) => r.rank != null && r.artist);
 }
 
-module.exports = { scrapeYoutube, parseYoutubeChartUrl, parseChartRows };
+// Fetch a charts.youtube.com chart via the keyless InnerTube browse endpoint.
+async function fetchChartsInnertube({ chartType, country, label }) {
+  const body = {
+    context: { client: { clientName: 'WEB_MUSIC_ANALYTICS', clientVersion: '2.0', hl: 'en', gl: country.toUpperCase(), theme: 'MUSIC' }, capabilities: {}, request: { internalExperimentFlags: [] } },
+    browseId: 'FEmusic_analytics_charts_home',
+    query: `perspective=CHART_DETAILS&chart_params_country_code=${country}&chart_params_chart_type=${chartType}&chart_params_period_type=WEEKLY`,
+  };
+  const res = await fetch(`https://charts.youtube.com/youtubei/v1/browse?alt=json&key=${INNERTUBE_KEY}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Origin: 'https://charts.youtube.com', Referer: 'https://charts.youtube.com/', 'User-Agent': BROWSER_UA },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!res.ok) { console.warn(`[youtube] charts ${chartType}/${country} HTTP ${res.status}`); return []; }
+  return parseChartRows(await res.json(), chartType, label);
+}
+
+// Fetch the official "Trending Music Videos" list via the Supabase proxy
+// (needs the secret YouTube Data API key, so it stays server-side).
+async function fetchOfficialTrending({ country, label }) {
+  const res = await fetch(`${supabase.url}/functions/v1/youtube-proxy`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(await auth.authHeaders()) },
+    body: JSON.stringify({ regionCode: country.toUpperCase() }),
+  });
+  if (!res.ok) { console.warn(`[youtube] proxy error ${res.status}`); return []; }
+  const data = await res.json();
+  return (data && data.items ? data.items : []).map((item, i) => {
+    const rawTitle = item.snippet.title;
+    const channelName = item.snippet.channelTitle.replace(/\s*-\s*Topic$/i, '').trim();
+    let artist, song;
+    const dashIdx = rawTitle.indexOf(' - ');
+    if (dashIdx !== -1) {
+      artist = rawTitle.slice(0, dashIdx).trim();
+      song = rawTitle.slice(dashIdx + 3).replace(/\s*[\[(][^\])]*(Official|Video|Audio|Lyrics|ft\.|feat\.)[^\])]*[\])]/gi, '').trim();
+    } else {
+      artist = channelName;
+      song = rawTitle.replace(/\s*[\[(][^\])]*(Official|Video|Audio|Lyrics)[^\])]*[\])]/gi, '').trim();
+    }
+    return { rank: i + 1, title: song, artist, views: parseInt(item.statistics?.viewCount || 0, 10) || null, signals: [label], source: 'youtube' };
+  });
+}
+
+// Resolve one youtube source row to normalized chart rows. Throws on an
+// unparseable URL (callers decide whether to surface or swallow).
+async function scrapeYoutubeSource(source) {
+  const d = parseYoutubeChartUrl(source.url);
+  return d.mode === 'charts' ? fetchChartsInnertube(d) : fetchOfficialTrending(d);
+}
+
+// Scrape every enabled youtube source, swallowing per-source failures, and
+// concatenate into one flat array (the scorer dedupes by best rank per artist).
+async function scrapeYoutubeSources(sources) {
+  const results = await Promise.all((sources || []).map((s) =>
+    scrapeYoutubeSource(s).catch((e) => { console.warn(`[youtube] ${s.name} failed: ${e.message}`); return []; })
+  ));
+  const rows = results.flat();
+  console.log(`[youtube] ${(sources || []).length} charts → ${rows.length} rows`);
+  return rows;
+}
+
+module.exports = { scrapeYoutube, parseYoutubeChartUrl, parseChartRows, scrapeYoutubeSource, scrapeYoutubeSources };

@@ -43,3 +43,27 @@ assert.deepStrictEqual(artists[0], { rank: 1, title: null, artist: 'Drake', view
 // Missing/garbage data → empty array, never throws
 assert.deepStrictEqual(parseChartRows({}, 'TRACKS', 'x'), []);
 console.log('✓ parseChartRows');
+
+const { scrapeYoutubeSource } = require('../scraper/youtube');
+
+(async () => {
+  // Charts mode hits charts.youtube.com directly; stub global.fetch to return a fixture.
+  const realFetch = global.fetch;
+  let calledUrl = null;
+  global.fetch = async (url) => {
+    calledUrl = String(url);
+    return { ok: true, json: async () => require('./fixtures/yt-tracks.json') };
+  };
+  try {
+    const rows = await scrapeYoutubeSource({ url: 'https://charts.youtube.com/charts/TopSongs/us/weekly', name: 'Top Songs US' });
+    assert.ok(calledUrl.startsWith('https://charts.youtube.com/youtubei/v1/browse'), 'calls InnerTube endpoint');
+    assert.strictEqual(rows.length, 2);
+    assert.strictEqual(rows[0].artist, 'Ella Langley');
+  } finally {
+    global.fetch = realFetch;
+  }
+
+  // A bad URL throws (so the Test button can surface the message).
+  await assert.rejects(scrapeYoutubeSource({ url: 'https://charts.youtube.com/charts/TopGenres/us/weekly', name: 'x' }), /Unsupported chart/i);
+  console.log('✓ scrapeYoutubeSource (charts mode + error surfacing)');
+})().catch((e) => { console.error(e); process.exit(1); });
