@@ -5,6 +5,8 @@ const fs = require('fs');
 let mainWindow = null;
 let tray = null;
 let isQuitting = false;
+let appReady = false;
+let pendingDeepLink = null;
 
 // ── Helpers ───────────────────────────────────────────────────
 
@@ -34,6 +36,44 @@ function showWindow() {
   if (mainWindow.isMinimized()) mainWindow.restore();
   mainWindow.show();
   mainWindow.focus();
+}
+
+// ── Deep links (musicdigest://) ───────────────────────────────
+// Confirmation / password-reset emails redirect to
+//   musicdigest://auth-callback#access_token=…&refresh_token=…
+// The OS hands that URL to us; we establish the session via the local server
+// (so the user lands signed-in), then focus the window.
+async function handleDeepLink(url) {
+  try {
+    if (!url || !url.toLowerCase().startsWith('musicdigest://')) return;
+    const parsed = new URL(url);
+    const frag = (parsed.hash || '').replace(/^#/, '');
+    const params = new URLSearchParams(frag || parsed.search);
+    const access_token = params.get('access_token');
+    const refresh_token = params.get('refresh_token');
+    const expires_in = params.get('expires_in');
+
+    if (access_token && refresh_token) {
+      try {
+        const port = require('../config').PORT;
+        await fetch(`http://localhost:${port}/api/auth/session`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ access_token, refresh_token, expires_in }),
+        });
+        if (mainWindow) mainWindow.webContents.reload(); // re-render as signed-in
+      } catch (err) {
+        console.warn('[deeplink] could not establish session:', err.message);
+      }
+    } else {
+      const errDesc = params.get('error_description') || params.get('error');
+      if (errDesc) console.warn('[deeplink] auth error in callback:', errDesc);
+    }
+    showWindow();
+  } catch (err) {
+    console.warn('[deeplink] failed to handle url:', err.message);
+    showWindow();
+  }
 }
 
 // ── App menu ──────────────────────────────────────────────────
@@ -133,7 +173,26 @@ const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();
 } else {
-  app.on('second-instance', showWindow);
+  // Register the musicdigest:// scheme so confirmation-email links open the app.
+  if (process.defaultApp && process.argv.length >= 2) {
+    app.setAsDefaultProtocolClient('musicdigest', process.execPath, [path.resolve(process.argv[1])]);
+  } else {
+    app.setAsDefaultProtocolClient('musicdigest');
+  }
+
+  // macOS delivers deep links via open-url (can fire before the app is ready).
+  app.on('open-url', (event, url) => {
+    event.preventDefault();
+    if (appReady) handleDeepLink(url);
+    else pendingDeepLink = url;
+  });
+
+  // Windows/Linux deliver the link as an argv on the second launch.
+  app.on('second-instance', (event, argv) => {
+    const link = (argv || []).find(a => a.startsWith('musicdigest://'));
+    if (link) handleDeepLink(link);
+    else showWindow();
+  });
 
   app.whenReady().then(async () => {
     // Load credentials: bundled .env in packaged app, local .env in dev
@@ -170,6 +229,12 @@ if (!gotLock) {
         mainWindow?.webContents.reload();
       });
     }
+
+    appReady = true;
+    // Handle a deep link that cold-started the app (buffered open-url on macOS,
+    // or passed as argv on Windows/Linux).
+    const launchLink = pendingDeepLink || process.argv.find(a => a.startsWith('musicdigest://'));
+    if (launchLink) { pendingDeepLink = null; handleDeepLink(launchLink); }
   });
 
   // Clicking the Dock icon re-shows the window
