@@ -522,7 +522,7 @@ export function SourcesScreen({ activePersonaId, personas = [], onPersonaSources
           onChange={e => { setNewType(e.target.value); setNewUrl(''); setNewSel(''); }}
           style={{ background: 'var(--bg-elev)', border: '1px solid var(--line)', color: 'var(--text)', padding: '8px 12px', borderRadius: 7, font: 'inherit', fontSize: 13, outline: 'none' }}
         >
-          {Object.entries(TYPE_LABELS).filter(([v]) => v !== 'tokchart' && v !== 'youtube').map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          {Object.entries(TYPE_LABELS).filter(([v]) => v !== 'tokchart').map(([v, l]) => <option key={v} value={v}>{l}</option>)}
         </select>
         <input
           className="form-input"
@@ -578,7 +578,7 @@ export function SourcesScreen({ activePersonaId, personas = [], onPersonaSources
                   >
                     {testing[s.id] === 'loading' ? '…' : testing[s.id] || 'Test'}
                   </button>
-                  {s.type !== 'tokchart' && s.type !== 'youtube' && (
+                  {s.type !== 'tokchart' && (
                     <button className="del" onClick={() => remove(s.id)} title="Remove">
                       <Icon name="trash" size={13} />
                     </button>
