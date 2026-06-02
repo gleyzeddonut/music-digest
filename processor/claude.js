@@ -20,7 +20,7 @@ function buildPrompt(date, redditData, webData, tiktokData = [], playlistData = 
         if (e.chartPositions.tiktok)       chartParts.push(`TikTok US #${e.chartPositions.tiktok}`);
         if (e.chartPositions.apple)        chartParts.push(`Apple Music #${e.chartPositions.apple}`);
         if (e.chartPositions.spotify)      chartParts.push(`Spotify Global #${e.chartPositions.spotify}`);
-        if (e.chartPositions.youtube)      chartParts.push(`YouTube Trending #${e.chartPositions.youtube}`);
+        if (e.chartPositions.youtube)      chartParts.push(`YouTube #${e.chartPositions.youtube}`);
         if (e.chartPositions.lastfm)       chartParts.push(`Last.fm Artists #${e.chartPositions.lastfm}`);
         if (e.chartPositions.lastfm_track) chartParts.push(`Last.fm Tracks #${e.chartPositions.lastfm_track}`);
         if (chartParts.length) lines.push(`  Charts: ${chartParts.join(', ')}`);
