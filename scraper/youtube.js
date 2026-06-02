@@ -59,10 +59,12 @@ function parseChartRows(data, chartType, label) {
   const content = section && section.content;
   if (!content) return [];
 
+  // Each chart type wraps its rows in a single-element list under a type key:
+  // trackTypes[0].trackViews, videos[0].videoViews, artists[0].artistViews.
   let rows;
   if (chartType === 'TRACKS') rows = content.trackTypes && content.trackTypes[0] && content.trackTypes[0].trackViews;
-  else if (chartType === 'VIDEOS') rows = content.videos;
-  else if (chartType === 'ARTISTS') rows = content.artists;
+  else if (chartType === 'VIDEOS') rows = content.videos && content.videos[0] && content.videos[0].videoViews;
+  else if (chartType === 'ARTISTS') rows = content.artists && content.artists[0] && content.artists[0].artistViews;
   rows = rows || [];
 
   return rows.map((r) => {
