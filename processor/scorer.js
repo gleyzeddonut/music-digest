@@ -57,6 +57,40 @@ function normalizeTrack(title) {
     .trim();
 }
 
+// Tokenize free text (post/headline titles) for whole-token artist matching.
+// Mirrors normalizeArtist's punctuation handling but does NOT strip feat/with
+// clauses, so collaborators named in a title remain matchable.
+function matchTokens(text) {
+  if (!text) return [];
+  return text
+    .toLowerCase()
+    .replace(/\$/g, 's')
+    .replace(/[^\w\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .split(' ')
+    .filter(Boolean);
+}
+
+// True only when an artist key's tokens appear as a contiguous run of COMPLETE
+// tokens in the text. Replaces raw substring matching, which let a degenerate
+// key like "t i" (from "T.I.") match inside unrelated words ("got it", "that
+// intro") and let "drake" match "drakeo". Accepts either raw text or a
+// pre-tokenized array (callers tokenize once per title for efficiency).
+function titleMentionsArtist(text, key) {
+  const needle = key.split(' ').filter(Boolean);
+  if (!needle.length) return false;
+  const hay = Array.isArray(text) ? text : matchTokens(text);
+  for (let i = 0; i + needle.length <= hay.length; i++) {
+    let match = true;
+    for (let j = 0; j < needle.length; j++) {
+      if (hay[i + j] !== needle[j]) { match = false; break; }
+    }
+    if (match) return true;
+  }
+  return false;
+}
+
 // ── Extract artist name from editorial headline ───────────────────────────────
 const MUSIC_VERBS = /\b(releases?|drops?|announces?|shares?|debuts?|performs?|covers?|remixes?|reveals?|signs?|joins?|leaves?|cancels?|postpones?|collaborates?|features?|previews?|interviews?|reviews?|tours?|albums?|singles?|videos?|eps?|mixtapes?)\b/i;
 
@@ -161,7 +195,7 @@ function buildMentionMap(redditData, webData, appleCharts, lastfmArtists, genius
   // Match editorial articles against all known artists by title scan
   for (const { source, items } of webData) {
     for (const item of items) {
-      const titleLower = (item.title || '').toLowerCase();
+      const titleToks = matchTokens(item.title || '');
 
       // Try headline-pattern extraction first (discovers non-chart artists)
       const extracted = extractArtistFromTitle(item.title || '');
@@ -176,9 +210,9 @@ function buildMentionMap(redditData, webData, appleCharts, lastfmArtists, genius
         }
       }
 
-      // Also scan all known chart artists in the title
+      // Also scan all known chart artists in the title (whole-token match)
       for (const [key, entity] of map.entries()) {
-        if (key.length >= 3 && titleLower.includes(key) &&
+        if (key.length >= 3 && titleMentionsArtist(titleToks, key) &&
             !entity.editorialArticles.some(a => a.title === item.title)) {
           entity.editorialArticles.push({ source, title: item.title, published: item.published });
         }
@@ -189,9 +223,9 @@ function buildMentionMap(redditData, webData, appleCharts, lastfmArtists, genius
   // Match Reddit posts against known artists in title
   for (const { source, posts } of redditData) {
     for (const post of posts) {
-      const titleLower = (post.title || '').toLowerCase();
+      const titleToks = matchTokens(post.title || '');
       for (const [key, entity] of map.entries()) {
-        if (key.length >= 3 && titleLower.includes(key)) {
+        if (key.length >= 3 && titleMentionsArtist(titleToks, key)) {
           entity.redditPosts.push({ source, ...post });
         }
       }
@@ -354,4 +388,4 @@ function score(redditData, webData, appleCharts, lastfmArtists, geniusTrending, 
   return { breaking, rising };
 }
 
-module.exports = { score, normalizeArtist, normalizeTrack };
+module.exports = { score, normalizeArtist, normalizeTrack, matchTokens, titleMentionsArtist };
