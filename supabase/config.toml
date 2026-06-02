@@ -17,3 +17,7 @@ port = 54323
 [auth]
 enabled = true
 site_url = "http://localhost:3000"
+# Deep-link callback so confirmation/reset emails open the desktop app.
+# NOTE: the hosted project also needs this added under
+# Auth → URL Configuration → Redirect URLs in the Supabase dashboard.
+additional_redirect_urls = ["musicdigest://auth-callback"]

@@ -131,6 +131,20 @@ router.post('/api/auth/logout', async (req, res) => {
   res.json(await authSession.signOut());
 });
 
+// Establish a session from tokens delivered via the musicdigest:// deep link
+// (email confirmation / password reset). Called by the Electron main process.
+router.post('/api/auth/session', async (req, res) => {
+  const { access_token, refresh_token, expires_in } = req.body || {};
+  if (!access_token || !refresh_token) return res.status(400).json({ error: 'Missing tokens' });
+  try {
+    const status = await authSession.setSessionFromTokens(access_token, refresh_token, expires_in);
+    if (status.authenticated) syncDigestRecipient(status.email);
+    res.json(status);
+  } catch (err) {
+    res.status(400).json({ error: err.message || 'Failed to set session' });
+  }
+});
+
 // ── Setup (first-run) ──────────────────────────────────────────
 
 router.post('/api/setup', (req, res) => {

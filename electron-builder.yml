@@ -2,6 +2,13 @@ appId: com.musicdigest.app
 productName: Music Digest
 copyright: Copyright © 2026
 
+# Registers the musicdigest:// URL scheme (adds CFBundleURLTypes to the macOS
+# Info.plist) so email confirmation links open the app instead of a web page.
+protocols:
+  - name: Music Digest
+    schemes:
+      - musicdigest
+
 directories:
   output: dist
 

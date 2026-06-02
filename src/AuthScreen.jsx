@@ -30,7 +30,7 @@ export function AuthScreen({ onAuthed }) {
       if (res.authenticated) {
         onAuthed();
       } else if (res.needsConfirmation) {
-        setNotice('Check your inbox to confirm your email, then sign in.');
+        setNotice('Almost there — check your inbox and click the confirmation link. It opens the app and signs you in.');
         setMode('signin');
         setPassword('');
       } else {

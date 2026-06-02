@@ -13,6 +13,11 @@ const { url: SUPABASE_URL, anonKey: ANON_KEY } = require('./supabase-client');
 
 const isElectron = !!process.versions.electron;
 
+// Deep-link target for confirmation/reset emails. The Electron app registers the
+// musicdigest:// scheme, so this link opens the app (and signs the user in)
+// instead of loading a web page. Must also be in Supabase Auth's Redirect URLs.
+const EMAIL_REDIRECT = 'musicdigest://auth-callback';
+
 // In-memory session: { access_token, refresh_token, expires_at(ms epoch), email }
 let session = null;
 let refreshPromise = null;
@@ -108,7 +113,7 @@ async function signIn(email, password) {
 }
 
 async function signUp(email, password) {
-  const data = await authFetch('signup', { email, password });
+  const data = await authFetch(`signup?redirect_to=${encodeURIComponent(EMAIL_REDIRECT)}`, { email, password });
   if (setSession(data)) return { ...getStatus(), needsConfirmation: false };
   // Email confirmation is enabled on the project — no session until confirmed.
   return { authenticated: false, email, needsConfirmation: true };
@@ -177,4 +182,26 @@ async function restore() {
   return getStatus();
 }
 
-module.exports = { signIn, signUp, signOut, getStatus, getAccessToken, authHeaders, restore };
+// Establish a session directly from tokens delivered by the deep-link callback
+// (musicdigest://auth-callback#access_token=...&refresh_token=...). Looks up the
+// user's email, then persists like any other sign-in.
+async function setSessionFromTokens(accessToken, refreshToken, expiresIn) {
+  if (!accessToken || !refreshToken) return getStatus();
+  let email = null;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      headers: { apikey: ANON_KEY, Authorization: `Bearer ${accessToken}` },
+    });
+    if (res.ok) email = (await res.json())?.email || null;
+  } catch { /* email stays null; the session is still valid */ }
+  session = {
+    access_token: accessToken,
+    refresh_token: refreshToken,
+    expires_at: Date.now() + (Number(expiresIn) || 3600) * 1000,
+    email,
+  };
+  persist();
+  return getStatus();
+}
+
+module.exports = { signIn, signUp, signOut, getStatus, getAccessToken, authHeaders, restore, setSessionFromTokens };
