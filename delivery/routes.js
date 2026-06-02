@@ -94,7 +94,13 @@ function syncDigestRecipient(email) {
   }
 }
 
-router.get('/api/auth/status', (req, res) => {
+router.get('/api/auth/status', async (req, res) => {
+  // Revive a persisted session before answering. restore() on boot refreshes the
+  // token asynchronously, so the renderer's first status check can otherwise win
+  // the race and wrongly report signed-out — forcing a needless re-login every
+  // launch. getAccessToken() refreshes from the saved token (deduped against the
+  // in-flight restore) and returns null only when genuinely signed out.
+  await authSession.getAccessToken();
   res.json(authSession.getStatus());
 });
 
