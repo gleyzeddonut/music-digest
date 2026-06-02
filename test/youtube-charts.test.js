@@ -26,3 +26,20 @@ assert.throws(() => parseYoutubeChartUrl('https://charts.youtube.com/charts/TopG
 assert.throws(() => parseYoutubeChartUrl('https://example.com/charts/TopSongs/us/weekly'), /YouTube/i);
 assert.throws(() => parseYoutubeChartUrl('not a url'), /Invalid URL/i);
 console.log('✓ parseYoutubeChartUrl');
+
+const { parseChartRows } = require('../scraper/youtube');
+
+const tracks = parseChartRows(require('./fixtures/yt-tracks.json'), 'TRACKS', 'YouTube Top Songs');
+assert.strictEqual(tracks.length, 2);
+assert.deepStrictEqual(tracks[0], { rank: 1, title: "Choosin' Texas", artist: 'Ella Langley', views: 6525533, signals: ['YouTube Top Songs'], source: 'youtube' });
+assert.strictEqual(tracks[1].artist, 'Artist Two, Guest'); // multiple artists joined
+
+const videos = parseChartRows(require('./fixtures/yt-videos.json'), 'VIDEOS', 'YouTube Top Videos');
+assert.deepStrictEqual(videos[0], { rank: 1, title: 'Some Video', artist: 'Drake', views: 999, signals: ['YouTube Top Videos'], source: 'youtube' });
+
+const artists = parseChartRows(require('./fixtures/yt-artists.json'), 'ARTISTS', 'YouTube Top Artists');
+assert.deepStrictEqual(artists[0], { rank: 1, title: null, artist: 'Drake', views: 1000000, signals: ['YouTube Top Artists'], source: 'youtube' });
+
+// Missing/garbage data → empty array, never throws
+assert.deepStrictEqual(parseChartRows({}, 'TRACKS', 'x'), []);
+console.log('✓ parseChartRows');

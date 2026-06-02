@@ -91,4 +91,42 @@ async function scrapeYoutube() {
   return results;
 }
 
-module.exports = { scrapeYoutube, parseYoutubeChartUrl };
+// Depth-first search for the first occurrence of a key (the InnerTube response
+// nests the chart section deep under contents.sectionListRenderer…).
+function findFirst(obj, target) {
+  if (!obj || typeof obj !== 'object') return null;
+  for (const k of Object.keys(obj)) {
+    if (k === target) return obj[k];
+    const found = findFirst(obj[k], target);
+    if (found) return found;
+  }
+  return null;
+}
+
+// Map an InnerTube charts response to normalized rows for the given chartType.
+// Returns [] on any structural surprise (never throws).
+function parseChartRows(data, chartType, label) {
+  const section = findFirst(data, 'musicAnalyticsSectionRenderer');
+  const content = section && section.content;
+  if (!content) return [];
+
+  let rows;
+  if (chartType === 'TRACKS') rows = content.trackTypes && content.trackTypes[0] && content.trackTypes[0].trackViews;
+  else if (chartType === 'VIDEOS') rows = content.videos;
+  else if (chartType === 'ARTISTS') rows = content.artists;
+  rows = rows || [];
+
+  return rows.map((r) => {
+    const rank = r.chartEntryMetadata && r.chartEntryMetadata.currentPosition;
+    const artist = chartType === 'ARTISTS'
+      ? r.name
+      : (r.artists || []).map((a) => a.name).filter(Boolean).join(', ');
+    let title = null;
+    if (chartType === 'TRACKS') title = r.name || null;
+    else if (chartType === 'VIDEOS') title = r.title || null;
+    const views = Number(r.viewCount);
+    return { rank, title, artist, views: Number.isFinite(views) ? views : null, signals: [label], source: 'youtube' };
+  }).filter((r) => r.rank != null && r.artist);
+}
+
+module.exports = { scrapeYoutube, parseYoutubeChartUrl, parseChartRows };

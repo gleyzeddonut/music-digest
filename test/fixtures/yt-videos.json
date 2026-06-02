@@ -1,0 +1,3 @@
+{ "contents": { "sectionListRenderer": { "contents": [ { "musicAnalyticsSectionRenderer": { "content": { "videos": [
+  { "title": "Some Video", "viewCount": "999", "artists": [ { "name": "Drake" } ], "chartEntryMetadata": { "currentPosition": 1 } }
+] } } } ] } } }
