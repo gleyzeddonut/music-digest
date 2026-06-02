@@ -1,7 +1,8 @@
 const nodemailer = require('nodemailer');
 const config = require('../config');
 const { getDb } = require('../db/init');
-const { url: supabaseUrl, anonKey } = require('../supabase-client');
+const { url: supabaseUrl } = require('../supabase-client');
+const auth = require('../auth-session');
 
 function getDigestTo() {
   return getDb().prepare('SELECT value FROM settings WHERE key = ?').get('digest_to')?.value || '';
@@ -134,15 +135,14 @@ function escHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
-async function sendViaSupabase(to, subject, html) {
+// The recipient is enforced server-side as the signed-in user's own email, so
+// `to` is not sent — the edge function ignores it. We keep the local-SMTP
+// fallback path (which still needs `to`) unchanged in the callers.
+async function sendViaSupabase(subject, html) {
   const res = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${anonKey}`,
-      'apikey': anonKey,
-    },
-    body: JSON.stringify({ to, subject, html }),
+    headers: { 'Content-Type': 'application/json', ...(await auth.authHeaders()) },
+    body: JSON.stringify({ subject, html }),
   });
   if (!res.ok) {
     const body = await res.text().catch(() => '');
@@ -164,7 +164,7 @@ async function sendDigestEmail(date, result, playlistUrl, added = [], unmatched 
 
   // Try centralized Supabase sender first (production path)
   try {
-    await sendViaSupabase(to, subject, html);
+    await sendViaSupabase(subject, html);
     console.log(`[email] Digest sent to ${to} via Supabase`);
     return true;
   } catch (err) {
@@ -242,7 +242,7 @@ async function sendCombinedDigestEmail(entries) {
   }
 
   try {
-    await sendViaSupabase(to, subject, html);
+    await sendViaSupabase(subject, html);
     console.log(`[email] Combined digest sent to ${to} via Supabase`);
     return true;
   } catch (err) {

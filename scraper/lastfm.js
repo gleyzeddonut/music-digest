@@ -1,12 +1,13 @@
 'use strict';
 
 const supabase = require('../supabase-client');
+const auth = require('../auth-session');
 
 async function lastfmGet(method, extra = {}) {
   try {
     const res = await fetch(`${supabase.url}/functions/v1/lastfm-proxy`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', apikey: supabase.anonKey },
+      headers: { 'Content-Type': 'application/json', ...(await auth.authHeaders()) },
       body: JSON.stringify({ method, limit: 50, ...extra }),
       signal: AbortSignal.timeout(10000),
     });

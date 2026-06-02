@@ -1,7 +1,4 @@
-const CORS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+import { CORS, json, requireUser } from '../_shared/auth.ts'
 
 const TOKEN_URL = 'https://accounts.spotify.com/api/token'
 const AUTH_URL  = 'https://accounts.spotify.com/authorize'
@@ -14,6 +11,9 @@ function creds() {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
 
+  const auth = await requireUser(req)
+  if (auth instanceof Response) return auth
+
   try {
     const { action, code, refresh_token, redirect_uri } = await req.json()
 
@@ -25,9 +25,7 @@ Deno.serve(async (req) => {
         scope:         SCOPES,
         state:         'music-digest',
       })
-      return new Response(JSON.stringify({ url: `${AUTH_URL}?${params}` }), {
-        headers: { ...CORS, 'Content-Type': 'application/json' },
-      })
+      return json({ url: `${AUTH_URL}?${params}` })
     }
 
     if (action === 'exchange') {
@@ -50,12 +48,8 @@ Deno.serve(async (req) => {
       return new Response(text, { status: res.status, headers: { ...CORS, 'Content-Type': 'application/json' } })
     }
 
-    return new Response(JSON.stringify({ error: 'Unknown action' }), {
-      status: 400, headers: { ...CORS, 'Content-Type': 'application/json' },
-    })
+    return json({ error: 'Unknown action' }, 400)
   } catch (err) {
-    return new Response(JSON.stringify({ error: String(err) }), {
-      status: 500, headers: { ...CORS, 'Content-Type': 'application/json' },
-    })
+    return json({ error: String(err) }, 500)
   }
 })

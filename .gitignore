@@ -9,3 +9,4 @@ assets/icon.iconset/
 npm-debug.log*
 out/
 supabase/.temp/
+.auth.json

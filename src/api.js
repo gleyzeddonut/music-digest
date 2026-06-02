@@ -17,6 +17,11 @@ async function j(path, opts = {}) {
 }
 
 export const api = {
+  authStatus:    ()                => j('/api/auth/status'),
+  login:         (email, password) => j('/api/auth/login',  { method: 'POST', body: JSON.stringify({ email, password }) }),
+  signup:        (email, password) => j('/api/auth/signup', { method: 'POST', body: JSON.stringify({ email, password }) }),
+  logout:        ()                => j('/api/auth/logout', { method: 'POST' }),
+
   status:        ()         => j('/api/status'),
   latestDigest:  ()         => j('/api/digest/latest'),
   digestList:    (page = 1) => j(`/api/digests?page=${page}`),

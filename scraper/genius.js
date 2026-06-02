@@ -2,6 +2,7 @@
 
 const axios    = require('axios');
 const supabase = require('../supabase-client');
+const auth     = require('../auth-session');
 
 const CHART_URL = 'https://genius.com/api/songs/chart';
 const HEADERS = {
@@ -45,11 +46,12 @@ async function fallbackSearch() {
   const songs = [];
 
   // Parallel queries — previously sequential, worst case ~60s; now completes in ~10s
+  const headers = { 'Content-Type': 'application/json', ...(await auth.authHeaders()) };
   const results = await Promise.allSettled(
     QUERIES.map(q =>
       fetch(`${supabase.url}/functions/v1/genius-proxy`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', apikey: supabase.anonKey },
+        headers,
         body: JSON.stringify({ path: '/search', params: { q, per_page: 20 } }),
         signal: AbortSignal.timeout(10000),
       }).then(res => {

@@ -1,10 +1,10 @@
-const CORS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+import { CORS, json, requireUser } from '../_shared/auth.ts'
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
+
+  const auth = await requireUser(req)
+  if (auth instanceof Response) return auth
 
   try {
     const key = Deno.env.get('YOUTUBE_API_KEY') ?? ''
@@ -18,14 +18,8 @@ Deno.serve(async (req) => {
 
     const res = await fetch(url.toString())
     const data = await res.json()
-    return new Response(JSON.stringify(data), {
-      status: res.status,
-      headers: { ...CORS, 'Content-Type': 'application/json' },
-    })
+    return json(data, res.status)
   } catch (err) {
-    return new Response(JSON.stringify({ error: String(err) }), {
-      status: 500,
-      headers: { ...CORS, 'Content-Type': 'application/json' },
-    })
+    return json({ error: String(err) }, 500)
   }
 })

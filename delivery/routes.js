@@ -4,6 +4,7 @@ const { getDb } = require('../db/init');
 const { runDigest } = require('../processor/digest');
 const { getAuthUrl, handleCallback, isConnected, getPlaylistUrl, getAccessToken } = require('../processor/spotify');
 const { sendDigestEmail } = require('./email');
+const authSession = require('../auth-session');
 
 // config-store is only available and callable in Electron context
 const configStore = process.versions.electron
@@ -77,6 +78,58 @@ function broadcastLog(level, args) {
     try { client.write(`data: ${payload}\n\n`); } catch (_) {}
   }
 }
+
+// ── Auth (Supabase email + password) ───────────────────────────
+// Sign-in is required before the app can run a digest or send email — every
+// edge-function call attaches the user's token. The digest always goes to the
+// signed-in account's own email, so we mirror it into digest_to here.
+function syncDigestRecipient(email) {
+  if (!email) return;
+  const db = getDb();
+  const existing = db.prepare("SELECT value FROM settings WHERE key = 'digest_to'").get()?.value;
+  if (!existing) {
+    db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('digest_to', email);
+    configStore.setConfig('digest_to', email);
+    process.env.DIGEST_TO = email;
+  }
+}
+
+router.get('/api/auth/status', (req, res) => {
+  res.json(authSession.getStatus());
+});
+
+router.post('/api/auth/login', async (req, res) => {
+  const { email, password } = req.body || {};
+  if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
+  try {
+    const status = await authSession.signIn(String(email).trim(), String(password));
+    syncDigestRecipient(status.email);
+    res.json(status);
+  } catch (err) {
+    res.status(401).json({ error: err.message || 'Sign-in failed' });
+  }
+});
+
+router.post('/api/auth/signup', async (req, res) => {
+  const { email, password } = req.body || {};
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ error: 'Valid email required' });
+  }
+  if (!password || String(password).length < 8) {
+    return res.status(400).json({ error: 'Password must be at least 8 characters' });
+  }
+  try {
+    const status = await authSession.signUp(String(email).trim(), String(password));
+    if (status.authenticated) syncDigestRecipient(status.email);
+    res.json(status);
+  } catch (err) {
+    res.status(400).json({ error: err.message || 'Sign-up failed' });
+  }
+});
+
+router.post('/api/auth/logout', async (req, res) => {
+  res.json(await authSession.signOut());
+});
 
 // ── Setup (first-run) ──────────────────────────────────────────
 
@@ -651,6 +704,8 @@ router.get('/api/status', (req, res) => {
     tracksInPlaylist: (() => { const [w, p] = personaWhere(req); return db.prepare(`SELECT COUNT(*) as n FROM playlist_tracks WHERE ${w}`).get(...p).n; })(),
     userName: db.prepare("SELECT value FROM settings WHERE key = 'user_name'").get()?.value || '',
     configured: !!digestTo,
+    authenticated: authSession.getStatus().authenticated,
+    userEmail: authSession.getStatus().email,
   });
 });
 
