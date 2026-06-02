@@ -1,5 +1,7 @@
 const axios = require('axios');
 const Parser = require('rss-parser');
+const supabase = require('../supabase-client');
+const auth = require('../auth-session');
 
 const LIMIT = 25;
 const VALID_SORTS = ['hot', 'rising', 'new', 'top-day', 'top-week', 'top-month'];
@@ -30,9 +32,9 @@ function buildRssUrl(slug, sort) {
   return `https://www.reddit.com/r/${slug}/${s}.rss?limit=${LIMIT}`;
 }
 
-async function tryJson(base, slug, sort) {
-  const url = buildJsonUrl(base, slug, sort);
-  const { data } = await axios.get(url, { headers: HEADERS, timeout: 10000 });
+// Shape Reddit's listing JSON (from the OAuth proxy or the public .json API)
+// into our post records. Both endpoints return the same children structure.
+function mapListing(data) {
   const posts = data?.data?.children || [];
   return posts
     .filter(p => !p.data.stickied)
@@ -45,10 +47,33 @@ async function tryJson(base, slug, sort) {
     }));
 }
 
+// Authenticated OAuth path via the Supabase reddit-proxy. Returns full
+// scores/comments and isn't subject to Reddit's anonymous-IP 403 blocks.
+async function tryProxy(slug, sort) {
+  const res = await fetch(`${supabase.url}/functions/v1/reddit-proxy`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(await auth.authHeaders()) },
+    body: JSON.stringify({ slug, sort }),
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!res.ok) return null; // 503 = proxy not configured; caller falls back
+  return mapListing(await res.json());
+}
+
+async function tryJson(base, slug, sort) {
+  const url = buildJsonUrl(base, slug, sort);
+  const { data } = await axios.get(url, { headers: HEADERS, timeout: 10000 });
+  return mapListing(data);
+}
+
 async function tryRss(slug, sort) {
   const url = buildRssUrl(slug, sort);
+  // Fetch with axios + browser headers — rss-parser's built-in HTTP client gets
+  // a 403 from Reddit, but the same browser User-Agent via axios returns 200.
+  // So we fetch the XML ourselves and only use rss-parser to parse the string.
+  const { data } = await axios.get(url, { headers: HEADERS, timeout: 10000, responseType: 'text' });
   const parser = new Parser({ timeout: 10000 });
-  const feed = await parser.parseURL(url);
+  const feed = await parser.parseString(data);
   return (feed.items || []).map(item => ({
     title: item.title || '',
     score: null,
@@ -59,7 +84,14 @@ async function tryRss(slug, sort) {
 }
 
 async function scrapeSubreddit(slug, sort = DEFAULT_SORT) {
-  // 1. Try old.reddit.com JSON (less aggressively blocked than www)
+  // 1. Authenticated OAuth proxy — full upvote/comment scores, no IP blocks.
+  try {
+    const posts = await tryProxy(slug, sort);
+    if (posts && posts.length > 0) return posts;
+  } catch (err) {
+    if (err.name !== 'AbortError') console.warn(`[reddit] r/${slug} proxy failed: ${err.message}`);
+  }
+  // 2. Direct JSON (works only from un-blocked IPs; usually 403 now)
   for (const base of ['https://old.reddit.com', 'https://www.reddit.com']) {
     try {
       const posts = await tryJson(base, slug, sort);
@@ -70,7 +102,7 @@ async function scrapeSubreddit(slug, sort = DEFAULT_SORT) {
       }
     }
   }
-  // 2. Fall back to RSS — no vote scores but titles still feed Claude
+  // 3. Fall back to RSS — no vote scores but titles still feed Claude
   try {
     const posts = await tryRss(slug, sort);
     if (posts.length > 0) {
