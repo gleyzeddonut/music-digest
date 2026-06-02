@@ -545,6 +545,9 @@ router.post('/api/sources/:id/test', async (req, res) => {
       const { scrapeSpotifyPlaylists } = require('../scraper/spotifyPlaylist');
       const result = await scrapeSpotifyPlaylists([source]);
       items = result[0]?.items || [];
+    } else if (source.type === 'youtube') {
+      const { scrapeYoutubeSource } = require('../scraper/youtube');
+      items = await scrapeYoutubeSource(source);
     } else if (source.type === 'tokchart') {
       const { scrapeTokchart } = require('../scraper/tokchart');
       items = await scrapeTokchart();
