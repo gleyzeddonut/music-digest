@@ -1,5 +1,6 @@
 const axios    = require('axios');
 const supabase = require('../supabase-client');
+const auth     = require('../auth-session');
 const config   = require('../config');
 const { getDb } = require('../db/init');
 
@@ -22,7 +23,7 @@ function setSetting(key, value) {
 async function spotifyAuth(body) {
   const res = await fetch(`${supabase.url}/functions/v1/spotify-proxy`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', apikey: supabase.anonKey },
+    headers: { 'Content-Type': 'application/json', ...(await auth.authHeaders()) },
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(15000),
   });

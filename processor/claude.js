@@ -1,4 +1,5 @@
 const supabase = require('../supabase-client');
+const auth = require('../auth-session');
 
 function buildPrompt(date, redditData, webData, tiktokData = [], playlistData = [], scoredData = null, tokchartData = []) {
   const lines = [`TODAY'S DATE: ${date}\n`];
@@ -151,7 +152,7 @@ Respond with valid JSON only, no markdown, no explanation:
   } else {
     const res = await fetch(`${supabase.url}/functions/v1/claude-proxy`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', apikey: supabase.anonKey },
+      headers: { 'Content-Type': 'application/json', ...(await auth.authHeaders()) },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
         max_tokens: 8000,

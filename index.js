@@ -147,6 +147,11 @@ function startServer() {
 ╚══════════════════════════════════════════╝
 `);
       verifySmtp();
+      // Revive a persisted Supabase session so the scheduler can run digests and
+      // send email without the user re-logging in after a restart.
+      require('./auth-session').restore()
+        .then(s => console.log(`[auth] ${s.authenticated ? `Signed in as ${s.email}` : 'Not signed in'}`))
+        .catch(err => console.warn('[auth] Session restore failed:', err.message));
       resolve();
     }).on('error', reject);
   });

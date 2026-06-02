@@ -324,7 +324,7 @@ function Sidebar({ route, onNavigate, spotifyConnected, personas = [], activePer
 
 // ─── Topbar ───────────────────────────────────────────────────
 
-function Topbar({ title, onRun, running, runPhase, userName, userEmail, onNavigate, spotifyConnected, playlistUrl, onOpenLog, onSpotifyConnect }) {
+function Topbar({ title, onRun, running, runPhase, userName, userEmail, onNavigate, spotifyConnected, playlistUrl, onOpenLog, onSpotifyConnect, onLogout }) {
   const [menuOpen, setMenuOpen] = React.useState(false);
   const initials = (userName || 'U').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
 
@@ -408,6 +408,11 @@ function Topbar({ title, onRun, running, runPhase, userName, userEmail, onNaviga
                 </button>
               </>
             )}
+            <div className="am-sep" />
+            <button className="am-item" onClick={() => { setMenuOpen(false); onLogout?.(); }}>
+              <Icon name="log" size={14} />
+              <span>Sign out</span>
+            </button>
           </div>
         )}
       </div>

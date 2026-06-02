@@ -17,6 +17,7 @@ import {
   PersonaEditorScreen,
 } from './screens.jsx';
 import { WelcomeScreen } from './WelcomeScreen.jsx';
+import { AuthScreen } from './AuthScreen.jsx';
 
 // ── Data adapter ──────────────────────────────────────────────────────────────
 
@@ -179,6 +180,7 @@ function App() {
   const [running, setRunning] = useState(false);
   const [runPhase, setRunPhase] = useState('');
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [authed, setAuthed] = useState(null); // null = checking, false = signed out
   const [selectedArtist, setSelectedArtist] = useState(null);
   const [showLog, setShowLog] = useState(false);
   const [monthlyData, setMonthlyData] = useState(null);
@@ -192,6 +194,15 @@ function App() {
 
   const loadData = useCallback(async () => {
     try {
+      // Auth gate first — no point loading the dashboard if signed out.
+      const auth = await api.authStatus().catch(() => ({ authenticated: false }));
+      if (!auth.authenticated) {
+        setAuthed(false);
+        setLoading(false);
+        return;
+      }
+      setAuthed(true);
+
       const [digest, list, status, personaList, activePersona] = await Promise.all([
         api.latestDigest().catch(() => null),
         api.digestList().catch(() => ({ digests: [], total: 0 })),
@@ -224,6 +235,14 @@ function App() {
   }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  const handleLogout = useCallback(async () => {
+    try { await api.logout(); } catch (_) {}
+    setAuthed(false);
+    setData(null);
+    setRawStatus(null);
+    setRoute('digest');
+  }, []);
 
   // ── Run digest ──────────────────────────────────────────────────────────────
 
@@ -400,6 +419,17 @@ function App() {
     }
   }, [rawStatus, navigate]);
 
+  // ── Auth gate ───────────────────────────────────────────────────────────────
+  // While the first auth check is in flight, `loading` is true → LoadingShell.
+
+  if (loading) {
+    return <LoadingShell />;
+  }
+
+  if (!authed) {
+    return <AuthScreen onAuthed={() => { setLoading(true); loadData(); }} />;
+  }
+
   // ── Onboarding ──────────────────────────────────────────────────────────────
 
   if (showOnboarding) {
@@ -530,6 +560,7 @@ function App() {
           playlistUrl={playlistUrl}
           onOpenLog={() => setShowLog(s => !s)}
           onSpotifyConnect={handleSpotifyConnect}
+          onLogout={handleLogout}
         />
         <div className="content-area">
           {screen}
