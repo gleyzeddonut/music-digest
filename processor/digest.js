@@ -9,7 +9,7 @@ const { scrapeGenius } = require('../scraper/genius');
 const { scrapeKworbShazam, scrapeKworbSpotify } = require('../scraper/kworb');
 const { scrapeHypem } = require('../scraper/hypem');
 const { scrapeTokchart } = require('../scraper/tokchart');
-const { scrapeYoutube }  = require('../scraper/youtube');
+const { scrapeYoutubeSources } = require('../scraper/youtube');
 const { score, normalizeArtist, normalizeTrack } = require('./scorer');
 const { processWithClaude } = require('./claude');
 const { appendSongsToPlaylist } = require('./spotify');
@@ -79,7 +79,7 @@ async function runDigest(opts = {}) {
   const tiktokSources    = sources.filter(s => s.type === 'tiktok');
   const playlistSources  = sources.filter(s => s.type === 'spotify-playlist');
   const tokchartEnabled  = sources.some(s => s.type === 'tokchart');
-  const youtubeEnabled   = sources.some(s => s.type === 'youtube');
+  const youtubeSources   = sources.filter(s => s.type === 'youtube');
 
   console.log('[PHASE] Scraping');
   console.log(`[digest] ${redditSources.length} subreddits · ${webSources.length} web sources · ${tiktokSources.length} TikTok · ${playlistSources.length} Spotify playlists`);
@@ -97,7 +97,7 @@ async function runDigest(opts = {}) {
     scrapeKworbSpotify(),
     tokchartEnabled ? scrapeTokchart().catch(e => { console.warn('[tokchart] failed:', e.message); return []; }) : [],
     scrapeHypem(),
-    youtubeEnabled  ? scrapeYoutube().catch(e => { console.warn('[youtube] failed:', e.message); return []; }) : [],
+    scrapeYoutubeSources(youtubeSources).catch(e => { console.warn('[youtube] failed:', e.message); return []; }),
   ]);
 
   // tiktokResult splits into formatted (for Claude prompt) and raw (for scorer)
