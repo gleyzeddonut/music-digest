@@ -1,4 +1,4 @@
-import { CORS, json, requireUser } from '../_shared/auth.ts'
+import { CORS, json, requireUser, enforceRateLimit } from '../_shared/auth.ts'
 
 const MAX_BODY = 1_000_000 // 1 MB — generous for a digest prompt, blocks abuse
 
@@ -7,6 +7,8 @@ Deno.serve(async (req) => {
 
   const auth = await requireUser(req)
   if (auth instanceof Response) return auth
+  const limited = await enforceRateLimit(auth.user.id, 'claude', 30, 3600)
+  if (limited) return limited
 
   try {
     const raw = await req.text()

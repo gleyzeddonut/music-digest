@@ -1,4 +1,4 @@
-import { CORS, json, requireUser } from '../_shared/auth.ts'
+import { CORS, json, requireUser, enforceRateLimit } from '../_shared/auth.ts'
 
 // Only the endpoints the app actually uses. The previous version concatenated a
 // caller-supplied `path` straight into the URL, so `path: "@evil.com/"` rewrote
@@ -11,6 +11,8 @@ Deno.serve(async (req) => {
 
   const auth = await requireUser(req)
   if (auth instanceof Response) return auth
+  const limited = await enforceRateLimit(auth.user.id, 'genius', 120, 3600)
+  if (limited) return limited
 
   try {
     const { path, params } = await req.json()  // e.g. { path: '/search', params: { q: 'artist' } }

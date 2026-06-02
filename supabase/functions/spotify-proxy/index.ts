@@ -1,4 +1,4 @@
-import { CORS, json, requireUser } from '../_shared/auth.ts'
+import { CORS, json, requireUser, enforceRateLimit } from '../_shared/auth.ts'
 
 const TOKEN_URL = 'https://accounts.spotify.com/api/token'
 const AUTH_URL  = 'https://accounts.spotify.com/authorize'
@@ -13,6 +13,8 @@ Deno.serve(async (req) => {
 
   const auth = await requireUser(req)
   if (auth instanceof Response) return auth
+  const limited = await enforceRateLimit(auth.user.id, 'spotify', 60, 3600)
+  if (limited) return limited
 
   try {
     const { action, code, refresh_token, redirect_uri } = await req.json()

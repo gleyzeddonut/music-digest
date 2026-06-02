@@ -46,3 +46,29 @@ export async function requireUser(req: Request): Promise<{ user: any } | Respons
   }
   return { user }
 }
+
+// Per-user fixed-window rate limit, backed by the public.check_rate_limit RPC.
+// Returns a 429 Response when the user is over `max` requests per `windowSeconds`
+// for the given `bucket`, or null to proceed. Fails OPEN (returns null) if the
+// limiter can't be reached, so a DB blip never locks out legitimate users.
+export async function enforceRateLimit(
+  userId: string, bucket: string, max: number, windowSeconds: number,
+): Promise<Response | null> {
+  const url = Deno.env.get('SUPABASE_URL')
+  const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  if (!url || !key) return null
+  try {
+    const res = await fetch(`${url}/rest/v1/rpc/check_rate_limit`, {
+      method: 'POST',
+      headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p_user: userId, p_bucket: bucket, p_max: max, p_window: `${windowSeconds} seconds` }),
+    })
+    if (!res.ok) return null
+    const allowed = await res.json()
+    return allowed === false
+      ? json({ error: 'Rate limit exceeded — try again later.' }, 429)
+      : null
+  } catch {
+    return null
+  }
+}

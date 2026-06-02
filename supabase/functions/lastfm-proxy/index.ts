@@ -1,10 +1,12 @@
-import { CORS, json, requireUser } from '../_shared/auth.ts'
+import { CORS, json, requireUser, enforceRateLimit } from '../_shared/auth.ts'
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
 
   const auth = await requireUser(req)
   if (auth instanceof Response) return auth
+  const limited = await enforceRateLimit(auth.user.id, 'lastfm', 120, 3600)
+  if (limited) return limited
 
   try {
     const params = await req.json()  // pass through all Last.fm API params

@@ -1,5 +1,5 @@
 import nodemailer from 'npm:nodemailer@6.9.16'
-import { CORS, json, requireUser } from '../_shared/auth.ts'
+import { CORS, json, requireUser, enforceRateLimit } from '../_shared/auth.ts'
 
 const MAX_HTML = 1_000_000 // 1 MB
 
@@ -20,6 +20,8 @@ Deno.serve(async (req) => {
 
   const auth = await requireUser(req)
   if (auth instanceof Response) return auth
+  const limited = await enforceRateLimit(auth.user.id, 'email', 15, 3600)
+  if (limited) return limited
   const to = auth.user.email // recipient is the authenticated user, never client-chosen
 
   try {
