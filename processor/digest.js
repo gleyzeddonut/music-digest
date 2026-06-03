@@ -80,6 +80,12 @@ async function runDigest(opts = {}) {
   const playlistSources  = sources.filter(s => s.type === 'spotify-playlist');
   const tokchartEnabled  = sources.some(s => s.type === 'tokchart');
   const youtubeSources   = sources.filter(s => s.type === 'youtube');
+  const appleEnabled         = sources.some(s => s.type === 'apple-charts');
+  const lastfmEnabled        = sources.some(s => s.type === 'lastfm');
+  const geniusEnabled        = sources.some(s => s.type === 'genius');
+  const shazamEnabled        = sources.some(s => s.type === 'shazam');
+  const spotifyGlobalEnabled = sources.some(s => s.type === 'spotify-global');
+  const hypemEnabled         = sources.some(s => s.type === 'hypem');
 
   console.log('[PHASE] Scraping');
   console.log(`[digest] ${redditSources.length} subreddits · ${webSources.length} web sources · ${tiktokSources.length} TikTok · ${playlistSources.length} Spotify playlists`);
@@ -90,13 +96,13 @@ async function runDigest(opts = {}) {
     scrapeWeb(webSources),
     scrapeTikTok(tiktokSources),
     scrapeSpotifyPlaylists(playlistSources),
-    scrapeAppleCharts(),
-    scrapeLastfm(),
-    scrapeGenius(),
-    scrapeKworbShazam(),
-    scrapeKworbSpotify(),
+    appleEnabled ? scrapeAppleCharts() : [],
+    lastfmEnabled ? scrapeLastfm() : { artists: [], tracks: [] },
+    geniusEnabled ? scrapeGenius() : [],
+    shazamEnabled ? scrapeKworbShazam() : [],
+    spotifyGlobalEnabled ? scrapeKworbSpotify() : [],
     tokchartEnabled ? scrapeTokchart().catch(e => { console.warn('[tokchart] failed:', e.message); return []; }) : [],
-    scrapeHypem(),
+    hypemEnabled ? scrapeHypem() : [],
     scrapeYoutubeSources(youtubeSources).catch(e => { console.warn('[youtube] failed:', e.message); return []; }),
   ]);
 
