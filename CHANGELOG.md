@@ -9,6 +9,8 @@ cut, the Unreleased entries move under that version's heading with the date.
 
 ## [Unreleased]
 
+## [1.7.4] — 2026-06-03
+
 ### Added
 - Custom per-persona playlists now show up as their own entries under **Library**
   in the sidebar. Click one to switch to that persona and open its playlist.
