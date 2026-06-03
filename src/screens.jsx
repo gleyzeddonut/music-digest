@@ -556,13 +556,15 @@ export function SourcesScreen({ activePersonaId, personas = [], onPersonaSources
       </div>
 
       {sources === null ? <LoadingShell /> : (() => {
-        const renderGroup = (type) => {
-          const items = grouped[type] || [];
+        // A group can span multiple source types (e.g. TikTok + Tokchart both
+        // cover TikTok) and is rendered under one shared header.
+        const renderGroup = (label, types) => {
+          const items = types.flatMap(t => grouped[t] || []);
           if (!items.length) return null;
           return (
-          <div key={type} className="src-group">
+          <div key={label} className="src-group">
             <div className="src-group-head">
-              <span className="label">{TYPE_LABELS[type]}</span>
+              <span className="label">{label}</span>
               <span className="count">({items.length})</span>
             </div>
             {items.map(s => (
@@ -576,7 +578,7 @@ export function SourcesScreen({ activePersonaId, personas = [], onPersonaSources
                   {s.name}
                   <span className="u">{s.url}</span>
                 </div>
-                <div className={`src-type-tag ${typeTagClass[type] || 't-html'}`}>{TYPE_LABELS[type]}</div>
+                <div className={`src-type-tag ${typeTagClass[s.type] || 't-html'}`}>{TYPE_LABELS[s.type]}</div>
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                   <button
                     style={{ fontSize: 11, padding: '4px 9px', background: 'var(--bg-elev)', border: '1px solid var(--line)', borderRadius: 5, color: 'var(--text-2)', cursor: 'pointer' }}
@@ -595,13 +597,28 @@ export function SourcesScreen({ activePersonaId, personas = [], onPersonaSources
           </div>
           );
         };
-        const sectionStyle = { fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-2)', margin: '18px 2px 8px' };
+        // Built-in groups: TikTok + Tokchart share one header; the rest are 1:1.
+        const builtinGroups = [
+          { label: 'TikTok', types: ['tiktok', 'tokchart'] },
+          { label: 'Apple Charts', types: ['apple-charts'] },
+          { label: 'Last.fm', types: ['lastfm'] },
+          { label: 'Genius', types: ['genius'] },
+          { label: 'Shazam', types: ['shazam'] },
+          { label: 'Spotify Global', types: ['spotify-global'] },
+          { label: 'Hype Machine', types: ['hypem'] },
+        ];
+        const renderSection = (title, subtitle) => (
+          <div style={{ margin: '24px 2px 12px' }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{title}</div>
+            <div style={{ fontSize: 12.5, color: 'var(--text-2)', marginTop: 3 }}>{subtitle}</div>
+          </div>
+        );
         return (
           <>
-            <div style={sectionStyle}>Custom</div>
-            {CUSTOM_TYPES.map(renderGroup)}
-            <div style={sectionStyle}>Built-in</div>
-            {BUILTIN_TYPES.map(renderGroup)}
+            {renderSection('Built-in sources', "Fixed charts & feeds. Toggle them on or off — they can't be removed.")}
+            {builtinGroups.map(g => renderGroup(g.label, g.types))}
+            {renderSection('Custom sources', 'Sources you add yourself. Paste a URL above to add more.')}
+            {CUSTOM_TYPES.map(t => renderGroup(TYPE_LABELS[t], [t]))}
           </>
         );
       })()}
