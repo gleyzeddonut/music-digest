@@ -429,7 +429,10 @@ export function SourcesScreen({ activePersonaId, personas = [], onPersonaSources
   const [testing, setTesting] = React.useState({});
   const [personaSourceIds, setPersonaSourceIds] = React.useState(null);
 
-  const TYPE_LABELS = { reddit: 'Reddit', rss: 'RSS', html: 'HTML', tiktok: 'TikTok', 'spotify-playlist': 'Spotify', tokchart: 'Tokchart', youtube: 'YouTube' };
+  const TYPE_LABELS = { reddit: 'Reddit', rss: 'RSS', html: 'HTML', tiktok: 'TikTok', 'spotify-playlist': 'Spotify', tokchart: 'Tokchart', youtube: 'YouTube', 'apple-charts': 'Apple Charts', lastfm: 'Last.fm', genius: 'Genius', shazam: 'Shazam', 'spotify-global': 'Spotify Global', hypem: 'Hype Machine' };
+  // Keep in sync with lib/source-types.js
+  const BUILTIN_TYPES = ['apple-charts', 'lastfm', 'genius', 'shazam', 'spotify-global', 'hypem', 'tiktok', 'tokchart'];
+  const CUSTOM_TYPES  = ['reddit', 'rss', 'html', 'spotify-playlist', 'youtube'];
   const URL_LABEL = { reddit: 'Subreddit slug', rss: 'Feed URL', html: 'Page URL', tiktok: 'Identifier', 'spotify-playlist': 'Playlist URL or ID', youtube: 'Chart URL' };
   const URL_PH = { reddit: 'indieheads', rss: 'https://…/feed', html: 'https://…', tiktok: 'tiktok://trending', 'spotify-playlist': 'https://open.spotify.com/playlist/…', youtube: 'https://charts.youtube.com/charts/TrendingVideos/us/RightNow' };
 
@@ -496,7 +499,8 @@ export function SourcesScreen({ activePersonaId, personas = [], onPersonaSources
     }
   };
 
-  const grouped = { reddit: [], rss: [], html: [], tiktok: [], 'spotify-playlist': [], tokchart: [], youtube: [] };
+  const ALL_TYPES = [...CUSTOM_TYPES, ...BUILTIN_TYPES];
+  const grouped = Object.fromEntries(ALL_TYPES.map(t => [t, []]));
   for (const s of (sources || [])) {
     if (grouped[s.type] !== undefined) grouped[s.type].push(s);
     else grouped.html.push(s);
@@ -522,7 +526,7 @@ export function SourcesScreen({ activePersonaId, personas = [], onPersonaSources
           onChange={e => { setNewType(e.target.value); setNewUrl(''); setNewSel(''); }}
           style={{ background: 'var(--bg-elev)', border: '1px solid var(--line)', color: 'var(--text)', padding: '8px 12px', borderRadius: 7, font: 'inherit', fontSize: 13, outline: 'none' }}
         >
-          {Object.entries(TYPE_LABELS).filter(([v]) => v !== 'tokchart').map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          {Object.entries(TYPE_LABELS).filter(([v]) => CUSTOM_TYPES.includes(v)).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
         </select>
         <input
           className="form-input"
@@ -551,9 +555,11 @@ export function SourcesScreen({ activePersonaId, personas = [], onPersonaSources
         <button className="btn-primary" onClick={addSource}>Add</button>
       </div>
 
-      {sources === null ? <LoadingShell /> : Object.entries(grouped).map(([type, items]) => {
-        if (!items.length) return null;
-        return (
+      {sources === null ? <LoadingShell /> : (() => {
+        const renderGroup = (type) => {
+          const items = grouped[type] || [];
+          if (!items.length) return null;
+          return (
           <div key={type} className="src-group">
             <div className="src-group-head">
               <span className="label">{TYPE_LABELS[type]}</span>
@@ -578,7 +584,7 @@ export function SourcesScreen({ activePersonaId, personas = [], onPersonaSources
                   >
                     {testing[s.id] === 'loading' ? '…' : testing[s.id] || 'Test'}
                   </button>
-                  {s.type !== 'tokchart' && (
+                  {!BUILTIN_TYPES.includes(s.type) && (
                     <button className="del" onClick={() => remove(s.id)} title="Remove">
                       <Icon name="trash" size={13} />
                     </button>
@@ -587,8 +593,18 @@ export function SourcesScreen({ activePersonaId, personas = [], onPersonaSources
               </div>
             ))}
           </div>
+          );
+        };
+        const sectionStyle = { fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-2)', margin: '18px 2px 8px' };
+        return (
+          <>
+            <div style={sectionStyle}>Custom</div>
+            {CUSTOM_TYPES.map(renderGroup)}
+            <div style={sectionStyle}>Built-in</div>
+            {BUILTIN_TYPES.map(renderGroup)}
+          </>
         );
-      })}
+      })()}
     </div>
   );
 }
