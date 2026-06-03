@@ -17,49 +17,35 @@ function getDb() {
   return _db;
 }
 
-const DEFAULT_SOURCES = [
-  // Reddit — public JSON API, no auth required
-  { type: 'reddit', name: 'r/indieheads',    url: 'indieheads' },
-  { type: 'reddit', name: 'r/hiphopheads',   url: 'hiphopheads' },
-  { type: 'reddit', name: 'r/popheads',      url: 'popheads' },
-  { type: 'reddit', name: 'r/listentothis',  url: 'listentothis' },
-  { type: 'reddit', name: 'r/electronicmusic', url: 'electronicmusic' },
-  { type: 'reddit', name: 'r/rnb',           url: 'rnb' },
-  { type: 'reddit', name: 'r/trap',          url: 'trap' },
-  { type: 'reddit', name: 'r/alternative',   url: 'alternative' },
-  { type: 'reddit', name: 'r/makinghiphop',  url: 'makinghiphop' },
-  { type: 'reddit', name: 'r/tiktokcharts',  url: 'tiktokcharts' },
-  // RSS feeds — reliable, structured
-  { type: 'rss', name: 'NME',                  url: 'https://www.nme.com/feed' },
-  { type: 'rss', name: 'Stereogum',             url: 'https://www.stereogum.com/feed/' },
-  { type: 'rss', name: 'Consequence of Sound',  url: 'https://consequence.net/feed/' },
-  { type: 'rss', name: 'Rolling Stone Music',   url: 'https://www.rollingstone.com/music/feed/' },
-  { type: 'rss', name: 'HotNewHipHop',          url: 'https://www.hotnewhiphop.com/feed/' },
-  { type: 'rss', name: 'Pitchfork',             url: 'https://pitchfork.com/feed/feed-news/rss/' },
-  { type: 'rss', name: 'Billboard',             url: 'https://www.billboard.com/feed/' },
-  { type: 'rss', name: 'Hypebeast Music',       url: 'https://hypebeast.com/music/feed' },
-  // RSS — previously HTML-scraped sites that have proper feeds
-  { type: 'rss', name: 'The FADER',  url: 'https://www.thefader.com/feed/music' },
-  { type: 'rss', name: 'XXL Mag',    url: 'https://www.xxlmag.com/feed/' },
-  // New editorial sources (signal scoring)
-  { type: 'rss', name: 'The Guardian Music', url: 'https://www.theguardian.com/music/rss' },
-  { type: 'rss', name: 'Variety Music',       url: 'https://variety.com/v/music/feed/' },
-  { type: 'rss', name: 'Uproxx Music',         url: 'https://uproxx.com/music/feed/' },
-  // TikTok Ads API (creative_radar_api) discontinued — removed
-  // Spotify Viral 50 playlist discontinued by Spotify in 2023 — removed
-  // Scrapers with fixed URLs (no user config needed)
-  { type: 'tiktok',   name: 'TikTok Charts', url: 'https://kworb.net/charts/tiktok/us.html' },
-  { type: 'tokchart', name: 'Tokchart',           url: 'https://tokchart.com' },
-  { type: 'youtube',  name: 'YouTube Trending',   url: 'https://charts.youtube.com/charts/TrendingVideos/us/RightNow' },
-  // Built-in fixed-feed scrapers (toggle-only in the UI). URLs are cosmetic —
-  // these scrapers ignore them, like the tokchart/youtube rows above.
-  { type: 'apple-charts',   name: 'Apple Charts',  url: 'https://music.apple.com/us/charts/songs' },
-  { type: 'lastfm',         name: 'Last.fm',       url: 'https://www.last.fm/charts' },
-  { type: 'genius',         name: 'Genius',        url: 'https://genius.com/#top-songs' },
-  { type: 'shazam',         name: 'Shazam',        url: 'https://www.shazam.com/charts/top-200/united-states' },
+// Built-in fixed-feed scrapers (toggle-only in the UI) — ensured on EVERY
+// install, fresh or upgraded, since they're the chart backbone for scoring.
+// URLs are cosmetic; these scrapers ignore them.
+const BUILTIN_SOURCES = [
+  { type: 'tiktok',         name: 'TikTok Charts',  url: 'https://kworb.net/charts/tiktok/us.html' },
+  { type: 'tokchart',       name: 'Tokchart',       url: 'https://tokchart.com' },
+  { type: 'apple-charts',   name: 'Apple Charts',   url: 'https://music.apple.com/us/charts/songs' },
+  { type: 'lastfm',         name: 'Last.fm',        url: 'https://www.last.fm/charts' },
+  { type: 'genius',         name: 'Genius',         url: 'https://genius.com/#top-songs' },
+  { type: 'shazam',         name: 'Shazam',         url: 'https://www.shazam.com/charts/top-200/united-states' },
   { type: 'spotify-global', name: 'Spotify Global', url: 'https://charts.spotify.com/charts/view/regional-global-daily/latest' },
-  { type: 'hypem',          name: 'Hype Machine',  url: 'https://hypem.com/popular' },
+  { type: 'hypem',          name: 'Hype Machine',   url: 'https://hypem.com/popular' },
 ];
+
+// Mainstream starter set seeded ONLY on a fresh install, so a new user's Custom
+// tab stays small instead of overwhelming. Existing installs keep whatever they
+// have already curated — these are NOT re-added on upgrade.
+const STARTER_CUSTOM_SOURCES = [
+  { type: 'reddit',  name: 'r/indieheads',        url: 'indieheads' },
+  { type: 'reddit',  name: 'r/hiphopheads',       url: 'hiphopheads' },
+  { type: 'reddit',  name: 'r/popheads',          url: 'popheads' },
+  { type: 'rss',     name: 'Pitchfork',           url: 'https://pitchfork.com/feed/feed-news/rss/' },
+  { type: 'rss',     name: 'Billboard',           url: 'https://www.billboard.com/feed/' },
+  { type: 'rss',     name: 'Rolling Stone Music', url: 'https://www.rollingstone.com/music/feed/' },
+  { type: 'youtube', name: 'YouTube Trending',    url: 'https://charts.youtube.com/charts/TrendingVideos/us/RightNow' },
+];
+
+// A fresh install seeds the lean starter custom set + all built-in feeds.
+const DEFAULT_SOURCES = [...STARTER_CUSTOM_SOURCES, ...BUILTIN_SOURCES];
 
 // One-time: add the built-in source IDs to every non-default persona, so
 // existing personas keep receiving the now-toggleable built-in feeds. Guarded
@@ -277,7 +263,9 @@ function initDb() {
     seedAll();
     console.log(`[db] Seeded ${DEFAULT_SOURCES.length} default sources`);
   } else {
-    // Add any new default sources that don't exist yet (by URL)
+    // Existing install: ensure the BUILT-IN feeds exist (they're the scoring
+    // backbone and toggle-only), but do NOT re-add custom starter sources — the
+    // user curates those, and a deleted one must stay deleted.
     const insertIfMissing = db.prepare(
       'INSERT OR IGNORE INTO sources (type, name, url, selector) VALUES (?, ?, ?, ?)'
     );
@@ -285,14 +273,14 @@ function initDb() {
     db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_sources_url ON sources(url)');
     const migrate = db.transaction(() => {
       let added = 0;
-      for (const s of DEFAULT_SOURCES) {
+      for (const s of BUILTIN_SOURCES) {
         const result = insertIfMissing.run(s.type, s.name, s.url, s.selector || null);
         if (result.changes) added++;
       }
       return added;
     });
     const added = migrate();
-    if (added > 0) console.log(`[db] Added ${added} new default source(s)`);
+    if (added > 0) console.log(`[db] Added ${added} built-in source(s)`);
 
     // Patch: remove old TikTok placeholder sources (superseded by the proper tiktok type entry)
     for (const oldUrl of [

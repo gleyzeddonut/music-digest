@@ -427,6 +427,7 @@ export function SourcesScreen({ activePersonaId, personas = [], onPersonaSources
   const [newUrl, setNewUrl] = React.useState('');
   const [newSel, setNewSel] = React.useState('');
   const [testing, setTesting] = React.useState({});
+  const [srcTab, setSrcTab] = React.useState('custom'); // 'custom' | 'builtin'
   const [personaSourceIds, setPersonaSourceIds] = React.useState(null);
 
   const TYPE_LABELS = { reddit: 'Reddit', rss: 'RSS', html: 'HTML', tiktok: 'TikTok', 'spotify-playlist': 'Spotify', tokchart: 'Tokchart', youtube: 'YouTube', 'apple-charts': 'Apple Charts', lastfm: 'Last.fm', genius: 'Genius', shazam: 'Shazam', 'spotify-global': 'Spotify Global', hypem: 'Hype Machine' };
@@ -518,7 +519,27 @@ export function SourcesScreen({ activePersonaId, personas = [], onPersonaSources
         <span className="section-sub">{sources?.length ?? '—'} active</span>
       </div>
 
-      {/* Add form */}
+      {/* Custom / Built-in tabs */}
+      <div style={{ display: 'flex', gap: 4, padding: 4, background: 'var(--bg-elev)', border: '1px solid var(--line)', borderRadius: 9, marginBottom: 18, width: 'fit-content' }}>
+        {[['custom', 'Custom'], ['builtin', 'Built-in']].map(([id, label]) => (
+          <button
+            key={id}
+            onClick={() => setSrcTab(id)}
+            style={{
+              padding: '7px 18px', borderRadius: 6, border: 'none', cursor: 'pointer',
+              font: 'inherit', fontSize: 13, fontWeight: 600,
+              background: srcTab === id ? 'var(--accent)' : 'transparent',
+              color: srcTab === id ? '#fff' : 'var(--text-2)',
+              transition: 'background 0.12s ease, color 0.12s ease',
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* Add form — custom sources only */}
+      {srcTab === 'custom' && (
       <div className="src-toolbar" style={{ flexWrap: 'wrap', gap: 8, paddingBottom: 16 }}>
         <select
           className="form-select"
@@ -554,6 +575,7 @@ export function SourcesScreen({ activePersonaId, personas = [], onPersonaSources
         )}
         <button className="btn-primary" onClick={addSource}>Add</button>
       </div>
+      )}
 
       {sources === null ? <LoadingShell /> : (() => {
         // A group can span multiple source types (e.g. TikTok + Tokchart both
@@ -607,18 +629,15 @@ export function SourcesScreen({ activePersonaId, personas = [], onPersonaSources
           { label: 'Spotify Global', types: ['spotify-global'] },
           { label: 'Hype Machine', types: ['hypem'] },
         ];
-        const renderSection = (title, subtitle) => (
-          <div style={{ margin: '24px 2px 12px' }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{title}</div>
-            <div style={{ fontSize: 12.5, color: 'var(--text-2)', marginTop: 3 }}>{subtitle}</div>
-          </div>
-        );
+        const blurb = srcTab === 'builtin'
+          ? "Fixed charts & feeds. Toggle them on or off — they can't be removed."
+          : 'Sources you add yourself. Paste a URL above to add more.';
         return (
           <>
-            {renderSection('Built-in sources', "Fixed charts & feeds. Toggle them on or off — they can't be removed.")}
-            {builtinGroups.map(g => renderGroup(g.label, g.types))}
-            {renderSection('Custom sources', 'Sources you add yourself. Paste a URL above to add more.')}
-            {CUSTOM_TYPES.map(t => renderGroup(TYPE_LABELS[t], [t]))}
+            <div style={{ fontSize: 12.5, color: 'var(--text-2)', margin: '0 2px 14px' }}>{blurb}</div>
+            {srcTab === 'builtin'
+              ? builtinGroups.map(g => renderGroup(g.label, g.types))
+              : CUSTOM_TYPES.map(t => renderGroup(TYPE_LABELS[t], [t]))}
           </>
         );
       })()}
