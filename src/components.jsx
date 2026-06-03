@@ -177,13 +177,12 @@ function Sidebar({ route, onNavigate, spotifyConnected, personas = [], activePer
   const handleDelete = () => {
     const p = ctxMenu.persona;
     setCtxMenu(null);
-    if (!window.confirm(`Delete "${p.name}" and all its digests, playlist tracks, and data? This cannot be undone.`)) return;
-    // If this persona has its own playlist, ask whether to remove it from Spotify too.
-    let deletePlaylist = false;
-    if (p.playlistName) {
-      deletePlaylist = window.confirm(`Also delete "${p.name}"'s Spotify playlist "${p.playlistName}"?\n\nOK — remove it from Spotify too.\nCancel — keep the playlist on Spotify.`);
-    }
-    onDeletePersona(p.id, deletePlaylist);
+    // Deleting a persona removes its playlist from the app (Library entry, name,
+    // tracks). The actual Spotify playlist is left untouched.
+    const msg = p.playlistName
+      ? `Delete "${p.name}"?\n\nThis removes the persona, its "${p.playlistName}" playlist, and all its digests from the app. Your Spotify playlist stays on Spotify.`
+      : `Delete "${p.name}" and all its digests, playlist tracks, and data? This cannot be undone.`;
+    if (window.confirm(msg)) onDeletePersona(p.id);
   };
 
   const activePersona = personas.find(p => p.id === activePersonaId);

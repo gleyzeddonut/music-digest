@@ -55,7 +55,7 @@ export const api = {
   setActivePersona: (id)     => j('/api/personas/active', { method: 'POST', body: JSON.stringify({ id }) }),
   createPersona:  (body)     => j('/api/personas', { method: 'POST', body: JSON.stringify(body) }),
   updatePersona:  (id, body) => j(`/api/personas/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
-  deletePersona:  (id, deletePlaylist = false) => j(`/api/personas/${id}?deletePlaylist=${deletePlaylist ? 'true' : 'false'}`, { method: 'DELETE' }),
+  deletePersona:  (id)       => j(`/api/personas/${id}`, { method: 'DELETE' }),
 };
 
 export function bgFromName(name = '') {

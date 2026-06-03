@@ -231,18 +231,6 @@ function getPlaylistUrl(personaId) {
   return id ? `https://open.spotify.com/playlist/${id}` : null;
 }
 
-// "Delete" a persona's Spotify playlist. Spotify has no hard delete, so we
-// unfollow it — which removes it from the user's library. Returns true if an
-// unfollow was attempted, false if the persona had no playlist.
-async function deletePersonaPlaylist(personaId) {
-  const playlistId = personaId ? getSetting(`spotify_playlist_id_${personaId}`) : null;
-  if (!playlistId) return false;
-  const token = await getAccessToken();
-  if (!token) return false;
-  await spotifyApi(token).delete(`/playlists/${playlistId}/followers`);
-  return true;
-}
-
 // ── Read a public playlist ────────────────────────────────────
 
 async function fetchPlaylistTracks(playlistId) {
@@ -273,4 +261,4 @@ async function fetchPlaylistTracks(playlistId) {
   return items;
 }
 
-module.exports = { getAuthUrl, handleCallback, appendSongsToPlaylist, isConnected, getPlaylistUrl, fetchPlaylistTracks, getAccessToken, deletePersonaPlaylist };
+module.exports = { getAuthUrl, handleCallback, appendSongsToPlaylist, isConnected, getPlaylistUrl, fetchPlaylistTracks, getAccessToken };

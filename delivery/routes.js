@@ -344,19 +344,12 @@ router.patch('/api/personas/:id', (req, res) => {
   res.json({ ok: true });
 });
 
-router.delete('/api/personas/:id', async (req, res) => {
+router.delete('/api/personas/:id', (req, res) => {
   const db = getDb();
   const id = parseInt(req.params.id, 10);
   const persona = db.prepare('SELECT * FROM personas WHERE id = ?').get(id);
   if (!persona) return res.status(404).json({ error: 'Persona not found' });
   if (persona.is_default) return res.status(400).json({ error: 'Cannot delete the built-in Main persona' });
-
-  // Optionally unfollow the persona's Spotify playlist before forgetting it.
-  // Best-effort: a Spotify failure must not block the local persona deletion.
-  if (req.query.deletePlaylist === 'true') {
-    try { await require('../processor/spotify').deletePersonaPlaylist(id); }
-    catch (err) { console.warn('[persona] playlist unfollow failed:', err.message); }
-  }
 
   db.transaction(() => {
     db.prepare('DELETE FROM digests WHERE persona_id = ?').run(id);
