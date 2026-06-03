@@ -430,7 +430,7 @@ export function SourcesScreen({ activePersonaId, personas = [], onPersonaSources
   const [srcTab, setSrcTab] = React.useState('custom'); // 'custom' | 'builtin'
   const [personaSourceIds, setPersonaSourceIds] = React.useState(null);
 
-  const TYPE_LABELS = { reddit: 'Reddit', rss: 'RSS', html: 'HTML', tiktok: 'TikTok', 'spotify-playlist': 'Spotify', tokchart: 'Tokchart', youtube: 'YouTube', 'apple-charts': 'Apple Charts', lastfm: 'Last.fm', genius: 'Genius', shazam: 'Shazam', 'spotify-global': 'Spotify Global', hypem: 'Hype Machine' };
+  const TYPE_LABELS = { reddit: 'Reddit', rss: 'RSS', html: 'HTML', tiktok: 'TikTok', 'spotify-playlist': 'Spotify', tokchart: 'TikTok', youtube: 'YouTube', 'apple-charts': 'Apple Charts', lastfm: 'Last.fm', genius: 'Genius', shazam: 'Shazam', 'spotify-global': 'Spotify Global', hypem: 'Hype Machine' };
   // Keep in sync with lib/source-types.js
   const BUILTIN_TYPES = ['apple-charts', 'lastfm', 'genius', 'shazam', 'spotify-global', 'hypem', 'tiktok', 'tokchart'];
   const CUSTOM_TYPES  = ['reddit', 'rss', 'html', 'spotify-playlist', 'youtube'];
@@ -1680,7 +1680,7 @@ export function PersonaEditorScreen({ onDone, onRefresh, onSwitchPersona }) {
 
   if (!personas) return <LoadingShell />;
 
-  const typeLabel = { reddit: 'Reddit', rss: 'RSS', html: 'HTML', tiktok: 'TikTok', 'spotify-playlist': 'Spotify', tokchart: 'Tokchart', youtube: 'YouTube' };
+  const typeLabel = { reddit: 'Reddit', rss: 'RSS', html: 'HTML', tiktok: 'TikTok', 'spotify-playlist': 'Spotify', tokchart: 'TikTok', youtube: 'YouTube' };
   const grouped = {};
   for (const s of sources) {
     const g = s.type; if (!grouped[g]) grouped[g] = []; grouped[g].push(s);

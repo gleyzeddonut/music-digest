@@ -13,6 +13,11 @@ cut, the Unreleased entries move under that version's heading with the date.
 - Custom per-persona playlists now show up as their own entries under **Library**
   in the sidebar. Click one to switch to that persona and open its playlist.
 
+### Changed
+- The two TikTok built-in feeds are now clearly named **TikTok Charts** (US chart
+  rank) and **TikTok Trending** (virality/momentum), and the shared default
+  playlist is labelled **Main Playlist** in the sidebar.
+
 ## [1.7.3] — 2026-06-03
 
 ### Changed

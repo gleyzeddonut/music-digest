@@ -22,7 +22,7 @@ function getDb() {
 // URLs are cosmetic; these scrapers ignore them.
 const BUILTIN_SOURCES = [
   { type: 'tiktok',         name: 'TikTok Charts',  url: 'https://kworb.net/charts/tiktok/us.html' },
-  { type: 'tokchart',       name: 'Tokchart',       url: 'https://tokchart.com' },
+  { type: 'tokchart',       name: 'TikTok Trending', url: 'https://tokchart.com' },
   { type: 'apple-charts',   name: 'Apple Charts',   url: 'https://music.apple.com/us/charts/songs' },
   { type: 'lastfm',         name: 'Last.fm',        url: 'https://www.last.fm/charts' },
   { type: 'genius',         name: 'Genius',         url: 'https://genius.com/#top-songs' },
@@ -310,6 +310,10 @@ function initDb() {
       }
     }
   }
+
+  // Rename the Tokchart row to clarify it's the TikTok *trending* feed (vs the
+  // TikTok Charts rank feed). Idempotent — only touches the old default name.
+  db.prepare("UPDATE sources SET name = 'TikTok Trending' WHERE type = 'tokchart' AND name = 'Tokchart'").run();
 
   // Run after sources are seeded (both fresh-seed and add-defaults paths) so the
   // built-in IDs exist before they're merged into personas.

@@ -258,13 +258,13 @@ function Sidebar({ route, onNavigate, spotifyConnected, personas = [], activePer
 
       <div className="nav-group">
         <div className="nav-label">Library</div>
-        {/* Default Playlist — active when viewing a persona that has no custom playlist */}
+        {/* Main playlist (shared default) — active when viewing a persona that has no custom playlist */}
         <div
           className={`nav-item${route === 'playlist' && !activePersona?.playlistName ? ' active' : ''}`}
           onClick={() => onNavigate('playlist')}
         >
           <span className="nav-icon"><Icon name="playlist" /></span>
-          <span>Playlist</span>
+          <span>Main Playlist</span>
         </div>
         {/* One entry per persona that has its own custom playlist */}
         {personas.filter(p => p.playlistName).map(p => (
