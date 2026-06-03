@@ -9,6 +9,8 @@ cut, the Unreleased entries move under that version's heading with the date.
 
 ## [Unreleased]
 
+## [1.7.6] — 2026-06-03
+
 ### Changed
 - Deleting a persona removes its playlist from the **app only** — it no longer
   unfollows/touches your Spotify playlist (reverting that part of 1.7.5). The
