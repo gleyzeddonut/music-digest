@@ -19,6 +19,9 @@ import {
 import { WelcomeScreen } from './WelcomeScreen.jsx';
 import { AuthScreen } from './AuthScreen.jsx';
 
+/* global __APP_VERSION__ */
+const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0';
+
 // ── Data adapter ──────────────────────────────────────────────────────────────
 
 function adaptDigest(digest, list, status) {
@@ -189,6 +192,7 @@ function App() {
   const [activePersonaId, setActivePersonaId] = useState(null);
   const [playlistName, setPlaylistName] = useState('🎵 Music Digest');
   const [playlistNameIsPersona, setPlaylistNameIsPersona] = useState(false);
+  const [updateInfo, setUpdateInfo] = useState(null); // { version, url } when a newer release exists
 
   // ── Initial load ────────────────────────────────────────────────────────────
 
@@ -235,6 +239,17 @@ function App() {
   }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  // Check GitHub for a newer release; surfaces an "Update to vX" pill in the sidebar.
+  useEffect(() => {
+    fetch('https://api.github.com/repos/gleyzeddonut/music-digest/releases/latest', { signal: AbortSignal.timeout(5000) })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        const latest = d?.tag_name?.replace(/^v/, '');
+        if (latest && latest !== APP_VERSION) setUpdateInfo({ version: latest, url: d.html_url });
+      })
+      .catch(() => {});
+  }, []);
 
   const handleLogout = useCallback(async () => {
     try { await api.logout(); } catch (_) {}
@@ -546,6 +561,7 @@ function App() {
         playlistName={playlistName}
         playlistNameIsPersona={playlistNameIsPersona}
         onPlaylistNameSave={handlePlaylistNameSave}
+        updateInfo={updateInfo}
       />
       <div className="main-col">
         <Topbar
