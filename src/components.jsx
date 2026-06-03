@@ -258,7 +258,27 @@ function Sidebar({ route, onNavigate, spotifyConnected, personas = [], activePer
 
       <div className="nav-group">
         <div className="nav-label">Library</div>
-        <NavItem id="playlist" label="Playlist" icon="playlist" route={route} onNavigate={onNavigate} />
+        {/* Default Playlist — active when viewing a persona that has no custom playlist */}
+        <div
+          className={`nav-item${route === 'playlist' && !activePersona?.playlistName ? ' active' : ''}`}
+          onClick={() => onNavigate('playlist')}
+        >
+          <span className="nav-icon"><Icon name="playlist" /></span>
+          <span>Playlist</span>
+        </div>
+        {/* One entry per persona that has its own custom playlist */}
+        {personas.filter(p => p.playlistName).map(p => (
+          <div
+            key={p.id}
+            className={`nav-item${route === 'playlist' && activePersonaId === p.id ? ' active' : ''}`}
+            style={{ paddingLeft: 26 }}
+            title={`${p.playlistName} · ${p.name}`}
+            onClick={() => { onPersonaSwitch(p.id); onNavigate('playlist'); }}
+          >
+            <span className="nav-icon"><Icon name="playlist" /></span>
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.playlistName}</span>
+          </div>
+        ))}
       </div>
 
       <div className="sidebar-bottom">

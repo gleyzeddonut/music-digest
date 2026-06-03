@@ -279,8 +279,16 @@ router.get('/api/spotify/token', async (req, res) => {
 // ── Personas API ──────────────────────────────────────────────
 
 router.get('/api/personas', (req, res) => {
-  const personas = getDb().prepare('SELECT * FROM personas ORDER BY is_default DESC, id ASC').all();
-  res.json(personas.map(p => ({ ...p, source_ids: safeJson(p.source_ids, []) })));
+  const db = getDb();
+  const personas = db.prepare('SELECT * FROM personas ORDER BY is_default DESC, id ASC').all();
+  // Surface each persona's own (custom) playlist so the Library list can show it.
+  // A persona has a custom playlist only when spotify_playlist_name_<id> is set.
+  const nameRow = db.prepare("SELECT value FROM settings WHERE key = ?");
+  res.json(personas.map(p => ({
+    ...p,
+    source_ids: safeJson(p.source_ids, []),
+    playlistName: nameRow.get(`spotify_playlist_name_${p.id}`)?.value || null,
+  })));
 });
 
 router.get('/api/personas/active', (req, res) => {
