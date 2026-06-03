@@ -1,5 +1,7 @@
 const Database = require('better-sqlite3');
 const path = require('path');
+const { BUILTIN_TYPES } = require('../lib/source-types');
+const { mergeBuiltinIds } = require('../lib/persona-sources');
 
 function getDbPath() {
   if (process.versions.electron) {
@@ -49,12 +51,41 @@ const DEFAULT_SOURCES = [
   { type: 'tiktok',   name: 'TikTok Charts', url: 'https://kworb.net/charts/tiktok/us.html' },
   { type: 'tokchart', name: 'Tokchart',           url: 'https://tokchart.com' },
   { type: 'youtube',  name: 'YouTube Trending',   url: 'https://charts.youtube.com/charts/TrendingVideos/us/RightNow' },
+  // Built-in fixed-feed scrapers (toggle-only in the UI). URLs are cosmetic —
+  // these scrapers ignore them, like the tokchart/youtube rows above.
+  { type: 'apple-charts',   name: 'Apple Charts',  url: 'https://music.apple.com/us/charts/songs' },
+  { type: 'lastfm',         name: 'Last.fm',       url: 'https://www.last.fm/charts' },
+  { type: 'genius',         name: 'Genius',        url: 'https://genius.com/#top-songs' },
+  { type: 'shazam',         name: 'Shazam',        url: 'https://www.shazam.com/charts/top-200/united-states' },
+  { type: 'spotify-global', name: 'Spotify Global', url: 'https://charts.spotify.com/charts/view/regional-global-daily/latest' },
+  { type: 'hypem',          name: 'Hype Machine',  url: 'https://hypem.com/popular' },
 ];
+
+// One-time: add the built-in source IDs to every non-default persona, so
+// existing personas keep receiving the now-toggleable built-in feeds. Guarded
+// by a settings flag so it runs exactly once — a built-in a user later removes
+// from a persona must stay removed.
+function migrateBuiltinsIntoPersonas(db) {
+  const done = db.prepare("SELECT value FROM settings WHERE key = 'builtin_persona_migration_done'").get();
+  if (done) return;
+  const ph = BUILTIN_TYPES.map(() => '?').join(',');
+  const builtinIds = db.prepare(`SELECT id FROM sources WHERE type IN (${ph})`).all(...BUILTIN_TYPES).map(r => r.id);
+  const personas = db.prepare('SELECT id, source_ids FROM personas WHERE is_default = 0').all();
+  const upd = db.prepare('UPDATE personas SET source_ids = ? WHERE id = ?');
+  db.transaction(() => {
+    for (const p of personas) {
+      let cur;
+      try { cur = JSON.parse(p.source_ids || '[]'); } catch { cur = []; }
+      upd.run(JSON.stringify(mergeBuiltinIds(cur, builtinIds)), p.id);
+    }
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('builtin_persona_migration_done', '1')").run();
+  })();
+}
 
 function initDb() {
   const db = getDb();
 
-  const NEW_TYPES = "'reddit','rss','html','tiktok','spotify-playlist','tokchart','youtube'";
+  const NEW_TYPES = "'reddit','rss','html','tiktok','spotify-playlist','tokchart','youtube','apple-charts','lastfm','genius','shazam','spotify-global','hypem'";
 
   // ── Personas table — must exist before any migration that assigns persona IDs ──
   db.exec(`
@@ -84,7 +115,7 @@ function initDb() {
   // ── Migration: sources type constraint ───────────────────────────────────────
   const tableInfo = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='sources'").get();
   const needsSourcesMigration = tableInfo && (
-    !tableInfo.sql.includes("'tiktok'") || !tableInfo.sql.includes("'spotify-playlist'") || !tableInfo.sql.includes("'tokchart'") || !tableInfo.sql.includes("'youtube'")
+    !tableInfo.sql.includes("'tiktok'") || !tableInfo.sql.includes("'spotify-playlist'") || !tableInfo.sql.includes("'tokchart'") || !tableInfo.sql.includes("'youtube'") || !tableInfo.sql.includes("'apple-charts'")
   );
   if (needsSourcesMigration) {
     db.transaction(() => {
@@ -291,6 +322,10 @@ function initDb() {
       }
     }
   }
+
+  // Run after sources are seeded (both fresh-seed and add-defaults paths) so the
+  // built-in IDs exist before they're merged into personas.
+  migrateBuiltinsIntoPersonas(db);
 
   return db;
 }
