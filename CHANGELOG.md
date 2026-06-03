@@ -9,6 +9,17 @@ cut, the Unreleased entries move under that version's heading with the date.
 
 ## [Unreleased]
 
+### Added
+- Deleting a persona now asks whether to also remove its Spotify playlist (it
+  gets unfollowed from your library); choose Cancel to keep the playlist.
+
+### Fixed
+- Clicking **Main Playlist** in the sidebar now switches back to the main persona
+  and shows the shared playlist (previously you could only switch back via the
+  persona dropdown).
+- Persona playlist entries under Library are aligned cleanly (removed the odd
+  indent).
+
 ## [1.7.4] — 2026-06-03
 
 ### Added

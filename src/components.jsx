@@ -177,9 +177,13 @@ function Sidebar({ route, onNavigate, spotifyConnected, personas = [], activePer
   const handleDelete = () => {
     const p = ctxMenu.persona;
     setCtxMenu(null);
-    if (window.confirm(`Delete "${p.name}" and all its digests, playlist tracks, and data? This cannot be undone.`)) {
-      onDeletePersona(p.id);
+    if (!window.confirm(`Delete "${p.name}" and all its digests, playlist tracks, and data? This cannot be undone.`)) return;
+    // If this persona has its own playlist, ask whether to remove it from Spotify too.
+    let deletePlaylist = false;
+    if (p.playlistName) {
+      deletePlaylist = window.confirm(`Also delete "${p.name}"'s Spotify playlist "${p.playlistName}"?\n\nOK — remove it from Spotify too.\nCancel — keep the playlist on Spotify.`);
     }
+    onDeletePersona(p.id, deletePlaylist);
   };
 
   const activePersona = personas.find(p => p.id === activePersonaId);
@@ -258,10 +262,11 @@ function Sidebar({ route, onNavigate, spotifyConnected, personas = [], activePer
 
       <div className="nav-group">
         <div className="nav-label">Library</div>
-        {/* Main playlist (shared default) — active when viewing a persona that has no custom playlist */}
+        {/* Main playlist (shared default) — clicking switches back to the default
+            persona so the Playlist view shows the shared playlist. */}
         <div
           className={`nav-item${route === 'playlist' && !activePersona?.playlistName ? ' active' : ''}`}
-          onClick={() => onNavigate('playlist')}
+          onClick={() => { const def = personas.find(p => p.is_default); if (def) onPersonaSwitch(def.id); onNavigate('playlist'); }}
         >
           <span className="nav-icon"><Icon name="playlist" /></span>
           <span>Main Playlist</span>
@@ -271,7 +276,6 @@ function Sidebar({ route, onNavigate, spotifyConnected, personas = [], activePer
           <div
             key={p.id}
             className={`nav-item${route === 'playlist' && activePersonaId === p.id ? ' active' : ''}`}
-            style={{ paddingLeft: 26 }}
             title={`${p.playlistName} · ${p.name}`}
             onClick={() => { onPersonaSwitch(p.id); onNavigate('playlist'); }}
           >

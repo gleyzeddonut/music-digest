@@ -348,9 +348,9 @@ function App() {
 
   // ── Persona delete ──────────────────────────────────────────────────────────
 
-  const handleDeletePersona = useCallback(async (id) => {
+  const handleDeletePersona = useCallback(async (id, deletePlaylist = false) => {
     try {
-      await api.deletePersona(id);
+      await api.deletePersona(id, deletePlaylist);
       if (id === activePersonaId) {
         const def = personas.find(p => p.is_default);
         if (def) { await api.setActivePersona(def.id); setActivePersonaId(def.id); }
