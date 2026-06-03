@@ -43,7 +43,50 @@ jobs:
       - name: Build renderer
         run: npm run build:ui
 
+      # Retry the build: electron-builder's DMG step intermittently fails on
+      # GitHub's macOS runners with `hdiutil detach ... exit code 1` (a flaky
+      # volume-unmount race, not a real error). --publish always is idempotent —
+      # it overwrites assets and reuses the existing draft release — so a retry
+      # safely completes the run.
       - name: Build & publish DMG to GitHub Releases
-        run: npx electron-builder --mac --publish always
+        run: |
+          for attempt in 1 2 3; do
+            echo "::group::electron-builder (attempt $attempt/3)"
+            if npx electron-builder --mac --publish always; then
+              echo "::endgroup::"
+              exit 0
+            fi
+            echo "::endgroup::"
+            echo "Attempt $attempt failed (likely a transient hdiutil/DMG flake); retrying in 15s…"
+            # Best-effort cleanup of a stale mount left by the failed attempt.
+            hdiutil detach -force '/Volumes/Music Digest' 2>/dev/null || true
+            sleep 15
+          done
+          echo "electron-builder failed after 3 attempts."
+          exit 1
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Populate the GitHub release body from the matching CHANGELOG.md section,
+      # so the published release shows what changed. The release was created
+      # (as a draft) by electron-builder in the step above.
+      - name: Set release notes from CHANGELOG
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          NOTES=$(awk -v ver="$VERSION" '
+            $0 ~ "^## \\[" ver "\\]" { capture=1; next }
+            capture && /^## \[/ { exit }
+            capture { print }
+          ' CHANGELOG.md)
+          # Trim leading/trailing blank lines (perl is portable on the macOS runner).
+          NOTES=$(printf '%s\n' "$NOTES" | perl -0pe 's/\A\n+//; s/\n+\z/\n/')
+          if [ -z "$NOTES" ]; then
+            echo "No CHANGELOG section for $VERSION; leaving release notes as-is."
+            exit 0
+          fi
+          printf '%s\n' "$NOTES" > release-notes.md
+          echo "--- release notes for $GITHUB_REF_NAME ---"; cat release-notes.md
+          gh release edit "$GITHUB_REF_NAME" --notes-file release-notes.md
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

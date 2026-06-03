@@ -9,6 +9,11 @@ cut, the Unreleased entries move under that version's heading with the date.
 
 ## [Unreleased]
 
+### Changed
+- GitHub releases now show notes pulled automatically from this changelog, and
+  the release build retries itself to ride out the occasional macOS DMG-packaging
+  flake.
+
 ## [1.7.2] — 2026-06-03
 
 ### Added
