@@ -2473,3 +2473,12 @@ img { display: block; max-width: 100%; }
   padding: 0;
 }
 .auth-link:hover { text-decoration: underline; }
+
+/* Sidebar "update available" pill */
+@keyframes updatePulse {
+  0%   { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.6); }
+  70%  { box-shadow: 0 0 0 6px rgba(255, 255, 255, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
+}
+.update-pill { transition: transform 0.12s ease, filter 0.12s ease; }
+.update-pill:hover { filter: brightness(1.08); transform: translateY(-1px); }

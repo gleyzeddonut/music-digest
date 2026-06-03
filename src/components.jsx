@@ -148,7 +148,7 @@ function _personaCount(p, totalSources) {
   return Array.isArray(p.source_ids) ? p.source_ids.length : null;
 }
 
-function Sidebar({ route, onNavigate, spotifyConnected, personas = [], activePersonaId, onPersonaSwitch, onManagePersonas, onDeletePersona, playlistName = '🎵 Music Digest', playlistNameIsPersona = false, onPlaylistNameSave, totalSources }) {
+function Sidebar({ route, onNavigate, spotifyConnected, personas = [], activePersonaId, onPersonaSwitch, onManagePersonas, onDeletePersona, playlistName = '🎵 Music Digest', playlistNameIsPersona = false, onPlaylistNameSave, totalSources, updateInfo = null }) {
   const [dropdownOpen, setDropdownOpen] = React.useState(false);
   const [ctxMenu, setCtxMenu] = React.useState(null); // { x, y, persona }
   const [localPlaylistName, setLocalPlaylistName] = React.useState(playlistName);
@@ -262,6 +262,33 @@ function Sidebar({ route, onNavigate, spotifyConnected, personas = [], activePer
       </div>
 
       <div className="sidebar-bottom">
+        {updateInfo && (
+          <a
+            className="update-pill"
+            href={updateInfo.url}
+            target="_blank"
+            rel="noreferrer"
+            title={`Download Music Digest v${updateInfo.version}`}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              margin: '0 0 12px', padding: '10px 12px',
+              background: 'var(--accent)', color: '#fff',
+              borderRadius: 9, fontSize: 12.5, fontWeight: 600,
+              textDecoration: 'none', cursor: 'pointer',
+              boxShadow: '0 3px 14px rgba(0,0,0,0.28)',
+            }}
+          >
+            <span className="update-pill-dot" style={{
+              width: 7, height: 7, borderRadius: '50%', background: '#fff',
+              boxShadow: '0 0 0 0 rgba(255,255,255,0.7)', flex: '0 0 auto',
+              animation: 'updatePulse 1.8s ease-out infinite',
+            }} />
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{ flex: '0 0 auto' }}>
+              <line x1="12" y1="19" x2="12" y2="5" /><polyline points="5 12 12 5 19 12" />
+            </svg>
+            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Update to v{updateInfo.version}</span>
+          </a>
+        )}
         <div className="spotify-pill">
           <div
             className="dot"
