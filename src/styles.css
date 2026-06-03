@@ -2482,3 +2482,61 @@ img { display: block; max-width: 100%; }
 }
 .update-pill { transition: transform 0.12s ease, filter 0.12s ease; }
 .update-pill:hover { filter: brightness(1.08); transform: translateY(-1px); }
+
+/* ============================================================
+   LAYOUT FIXES
+   (a) Instrument Serif reports block height one line short of
+       what it renders, so the last wrapped line of every serif
+       heading spills onto the element below. Reserve that line
+       with bottom padding.
+   (b) Pin one-line labels / badges / buttons with nowrap so they
+       stop wrapping inside their flex containers.
+   Appended last on purpose — these must win the cascade.
+   ============================================================ */
+
+/* (a) Hero headline — was crashing into the subhead.
+   Also slightly smaller + looser leading for better proportion. */
+.hero-title {
+  font-size: clamp(40px, 4.6vw, 66px);
+  line-height: 1.04;
+  letter-spacing: -0.02em;
+  margin-bottom: 12px;
+  padding-bottom: 0.92em;   /* reserves the spilled last line */
+  max-width: 72%;
+}
+
+/* (a) Other wrapping serif headings — reserve the spilled last line */
+.headline-title      { padding-bottom: 0.9em; }
+.hist-headline       { padding-bottom: 0.85em; }
+.detail-title        { padding-bottom: 0.18em; }
+.ob-title            { padding-bottom: 0.3em; }
+.pull-item .pull-val { padding-bottom: 0.22em; }
+.welcome-title       { line-height: 1.0; padding-bottom: 0.28em; }
+
+/* (b) One-line labels, badges, breadcrumbs, buttons — never wrap */
+.run-btn,
+.topbar .crumb,
+.hero-chip,
+.hero-issue,
+.hero-stat,
+.btn-play,
+.btn-ghost,
+.section-title,
+.section-eyebrow,
+.section-sub,
+.section-action,
+.headline .src-line,
+.src-group-head .label,
+.src-group-head .count,
+.set-row .k,
+.set-row .v,
+.hist-stats,
+.welcome-eyebrow,
+.ob-step-meta > span,
+.ob-skip,
+.ob-next,
+.ob-back { white-space: nowrap; }
+
+/* History "N picks · N songs" column was too narrow and wrapped */
+.hist-row { grid-template-columns: 120px 1fr 220px 116px; }
+.history-list-selecting .hist-row { grid-template-columns: 28px 120px 1fr 220px 116px; }

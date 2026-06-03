@@ -14,6 +14,12 @@ cut, the Unreleased entries move under that version's heading with the date.
   the release build retries itself to ride out the occasional macOS DMG-packaging
   flake.
 
+### Fixed
+- Layout polish — serif headings no longer overlap the text beneath them when
+  they wrap (most visibly the digest hero), and one-line labels, badges,
+  breadcrumbs, and buttons (e.g. "Run digest", source group headers, settings
+  rows, the history "picks · songs" column) no longer wrap awkwardly.
+
 ## [1.7.2] — 2026-06-03
 
 ### Added
