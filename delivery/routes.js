@@ -1,6 +1,7 @@
 const express = require('express');
 const path = require('path');
 const { getDb } = require('../db/init');
+const { CUSTOM_TYPES, BUILTIN_TYPES } = require('../lib/source-types');
 const { runDigest } = require('../processor/digest');
 const { getAuthUrl, handleCallback, isConnected, getPlaylistUrl, getAccessToken } = require('../processor/spotify');
 const { sendDigestEmail } = require('./email');
@@ -504,7 +505,7 @@ router.get('/api/sources', (req, res) => {
 router.post('/api/sources', (req, res) => {
   const { type, name, url, selector } = req.body;
   if (!type || !name || !url) return res.status(400).json({ error: 'type, name, url required' });
-  if (!['reddit', 'rss', 'html', 'tiktok', 'spotify-playlist', 'tokchart', 'youtube'].includes(type)) return res.status(400).json({ error: 'Invalid source type' });
+  if (!CUSTOM_TYPES.includes(type)) return res.status(400).json({ error: 'That source type is built-in or invalid and cannot be added' });
 
   try {
     const result = getDb().prepare(
@@ -528,7 +529,12 @@ router.patch('/api/sources/:id', (req, res) => {
 });
 
 router.delete('/api/sources/:id', (req, res) => {
-  getDb().prepare('DELETE FROM sources WHERE id = ?').run(req.params.id);
+  const db = getDb();
+  const src = db.prepare('SELECT type FROM sources WHERE id = ?').get(req.params.id);
+  if (src && BUILTIN_TYPES.includes(src.type)) {
+    return res.status(400).json({ error: 'Built-in sources cannot be deleted' });
+  }
+  db.prepare('DELETE FROM sources WHERE id = ?').run(req.params.id);
   res.json({ ok: true });
 });
 
@@ -551,6 +557,28 @@ router.post('/api/sources/:id/test', async (req, res) => {
       const { scrapeSpotifyPlaylists } = require('../scraper/spotifyPlaylist');
       const result = await scrapeSpotifyPlaylists([source]);
       items = result[0]?.items || [];
+    } else if (source.type === 'youtube') {
+      const { scrapeYoutubeSource } = require('../scraper/youtube');
+      items = await scrapeYoutubeSource(source);
+    } else if (source.type === 'apple-charts') {
+      const { scrapeAppleCharts } = require('../scraper/appleCharts');
+      items = await scrapeAppleCharts();
+    } else if (source.type === 'lastfm') {
+      const { scrapeLastfm } = require('../scraper/lastfm');
+      const r = await scrapeLastfm();
+      items = r.artists || [];
+    } else if (source.type === 'genius') {
+      const { scrapeGenius } = require('../scraper/genius');
+      items = await scrapeGenius();
+    } else if (source.type === 'shazam') {
+      const { scrapeKworbShazam } = require('../scraper/kworb');
+      items = await scrapeKworbShazam();
+    } else if (source.type === 'spotify-global') {
+      const { scrapeKworbSpotify } = require('../scraper/kworb');
+      items = await scrapeKworbSpotify();
+    } else if (source.type === 'hypem') {
+      const { scrapeHypem } = require('../scraper/hypem');
+      items = await scrapeHypem();
     } else if (source.type === 'tokchart') {
       const { scrapeTokchart } = require('../scraper/tokchart');
       items = await scrapeTokchart();

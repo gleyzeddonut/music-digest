@@ -429,7 +429,10 @@ export function SourcesScreen({ activePersonaId, personas = [], onPersonaSources
   const [testing, setTesting] = React.useState({});
   const [personaSourceIds, setPersonaSourceIds] = React.useState(null);
 
-  const TYPE_LABELS = { reddit: 'Reddit', rss: 'RSS', html: 'HTML', tiktok: 'TikTok', 'spotify-playlist': 'Spotify', tokchart: 'Tokchart', youtube: 'YouTube' };
+  const TYPE_LABELS = { reddit: 'Reddit', rss: 'RSS', html: 'HTML', tiktok: 'TikTok', 'spotify-playlist': 'Spotify', tokchart: 'Tokchart', youtube: 'YouTube', 'apple-charts': 'Apple Charts', lastfm: 'Last.fm', genius: 'Genius', shazam: 'Shazam', 'spotify-global': 'Spotify Global', hypem: 'Hype Machine' };
+  // Keep in sync with lib/source-types.js
+  const BUILTIN_TYPES = ['apple-charts', 'lastfm', 'genius', 'shazam', 'spotify-global', 'hypem', 'tiktok', 'tokchart'];
+  const CUSTOM_TYPES  = ['reddit', 'rss', 'html', 'spotify-playlist', 'youtube'];
   const URL_LABEL = { reddit: 'Subreddit slug', rss: 'Feed URL', html: 'Page URL', tiktok: 'Identifier', 'spotify-playlist': 'Playlist URL or ID', youtube: 'Chart URL' };
   const URL_PH = { reddit: 'indieheads', rss: 'https://…/feed', html: 'https://…', tiktok: 'tiktok://trending', 'spotify-playlist': 'https://open.spotify.com/playlist/…', youtube: 'https://charts.youtube.com/charts/TrendingVideos/us/RightNow' };
 
@@ -496,7 +499,8 @@ export function SourcesScreen({ activePersonaId, personas = [], onPersonaSources
     }
   };
 
-  const grouped = { reddit: [], rss: [], html: [], tiktok: [], 'spotify-playlist': [], tokchart: [], youtube: [] };
+  const ALL_TYPES = [...CUSTOM_TYPES, ...BUILTIN_TYPES];
+  const grouped = Object.fromEntries(ALL_TYPES.map(t => [t, []]));
   for (const s of (sources || [])) {
     if (grouped[s.type] !== undefined) grouped[s.type].push(s);
     else grouped.html.push(s);
@@ -522,7 +526,7 @@ export function SourcesScreen({ activePersonaId, personas = [], onPersonaSources
           onChange={e => { setNewType(e.target.value); setNewUrl(''); setNewSel(''); }}
           style={{ background: 'var(--bg-elev)', border: '1px solid var(--line)', color: 'var(--text)', padding: '8px 12px', borderRadius: 7, font: 'inherit', fontSize: 13, outline: 'none' }}
         >
-          {Object.entries(TYPE_LABELS).filter(([v]) => v !== 'tokchart' && v !== 'youtube').map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          {Object.entries(TYPE_LABELS).filter(([v]) => CUSTOM_TYPES.includes(v)).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
         </select>
         <input
           className="form-input"
@@ -551,12 +555,16 @@ export function SourcesScreen({ activePersonaId, personas = [], onPersonaSources
         <button className="btn-primary" onClick={addSource}>Add</button>
       </div>
 
-      {sources === null ? <LoadingShell /> : Object.entries(grouped).map(([type, items]) => {
-        if (!items.length) return null;
-        return (
-          <div key={type} className="src-group">
+      {sources === null ? <LoadingShell /> : (() => {
+        // A group can span multiple source types (e.g. TikTok + Tokchart both
+        // cover TikTok) and is rendered under one shared header.
+        const renderGroup = (label, types) => {
+          const items = types.flatMap(t => grouped[t] || []);
+          if (!items.length) return null;
+          return (
+          <div key={label} className="src-group">
             <div className="src-group-head">
-              <span className="label">{TYPE_LABELS[type]}</span>
+              <span className="label">{label}</span>
               <span className="count">({items.length})</span>
             </div>
             {items.map(s => (
@@ -570,7 +578,7 @@ export function SourcesScreen({ activePersonaId, personas = [], onPersonaSources
                   {s.name}
                   <span className="u">{s.url}</span>
                 </div>
-                <div className={`src-type-tag ${typeTagClass[type] || 't-html'}`}>{TYPE_LABELS[type]}</div>
+                <div className={`src-type-tag ${typeTagClass[s.type] || 't-html'}`}>{TYPE_LABELS[s.type]}</div>
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                   <button
                     style={{ fontSize: 11, padding: '4px 9px', background: 'var(--bg-elev)', border: '1px solid var(--line)', borderRadius: 5, color: 'var(--text-2)', cursor: 'pointer' }}
@@ -578,7 +586,7 @@ export function SourcesScreen({ activePersonaId, personas = [], onPersonaSources
                   >
                     {testing[s.id] === 'loading' ? '…' : testing[s.id] || 'Test'}
                   </button>
-                  {s.type !== 'tokchart' && s.type !== 'youtube' && (
+                  {!BUILTIN_TYPES.includes(s.type) && (
                     <button className="del" onClick={() => remove(s.id)} title="Remove">
                       <Icon name="trash" size={13} />
                     </button>
@@ -587,8 +595,33 @@ export function SourcesScreen({ activePersonaId, personas = [], onPersonaSources
               </div>
             ))}
           </div>
+          );
+        };
+        // Built-in groups: TikTok + Tokchart share one header; the rest are 1:1.
+        const builtinGroups = [
+          { label: 'TikTok', types: ['tiktok', 'tokchart'] },
+          { label: 'Apple Charts', types: ['apple-charts'] },
+          { label: 'Last.fm', types: ['lastfm'] },
+          { label: 'Genius', types: ['genius'] },
+          { label: 'Shazam', types: ['shazam'] },
+          { label: 'Spotify Global', types: ['spotify-global'] },
+          { label: 'Hype Machine', types: ['hypem'] },
+        ];
+        const renderSection = (title, subtitle) => (
+          <div style={{ margin: '24px 2px 12px' }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{title}</div>
+            <div style={{ fontSize: 12.5, color: 'var(--text-2)', marginTop: 3 }}>{subtitle}</div>
+          </div>
         );
-      })}
+        return (
+          <>
+            {renderSection('Built-in sources', "Fixed charts & feeds. Toggle them on or off — they can't be removed.")}
+            {builtinGroups.map(g => renderGroup(g.label, g.types))}
+            {renderSection('Custom sources', 'Sources you add yourself. Paste a URL above to add more.')}
+            {CUSTOM_TYPES.map(t => renderGroup(TYPE_LABELS[t], [t]))}
+          </>
+        );
+      })()}
     </div>
   );
 }

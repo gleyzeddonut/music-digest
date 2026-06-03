@@ -9,7 +9,7 @@ const { scrapeGenius } = require('../scraper/genius');
 const { scrapeKworbShazam, scrapeKworbSpotify } = require('../scraper/kworb');
 const { scrapeHypem } = require('../scraper/hypem');
 const { scrapeTokchart } = require('../scraper/tokchart');
-const { scrapeYoutube }  = require('../scraper/youtube');
+const { scrapeYoutubeSources } = require('../scraper/youtube');
 const { score, normalizeArtist, normalizeTrack } = require('./scorer');
 const { processWithClaude } = require('./claude');
 const { appendSongsToPlaylist } = require('./spotify');
@@ -79,7 +79,13 @@ async function runDigest(opts = {}) {
   const tiktokSources    = sources.filter(s => s.type === 'tiktok');
   const playlistSources  = sources.filter(s => s.type === 'spotify-playlist');
   const tokchartEnabled  = sources.some(s => s.type === 'tokchart');
-  const youtubeEnabled   = sources.some(s => s.type === 'youtube');
+  const youtubeSources   = sources.filter(s => s.type === 'youtube');
+  const appleEnabled         = sources.some(s => s.type === 'apple-charts');
+  const lastfmEnabled        = sources.some(s => s.type === 'lastfm');
+  const geniusEnabled        = sources.some(s => s.type === 'genius');
+  const shazamEnabled        = sources.some(s => s.type === 'shazam');
+  const spotifyGlobalEnabled = sources.some(s => s.type === 'spotify-global');
+  const hypemEnabled         = sources.some(s => s.type === 'hypem');
 
   console.log('[PHASE] Scraping');
   console.log(`[digest] ${redditSources.length} subreddits · ${webSources.length} web sources · ${tiktokSources.length} TikTok · ${playlistSources.length} Spotify playlists`);
@@ -90,14 +96,14 @@ async function runDigest(opts = {}) {
     scrapeWeb(webSources),
     scrapeTikTok(tiktokSources),
     scrapeSpotifyPlaylists(playlistSources),
-    scrapeAppleCharts(),
-    scrapeLastfm(),
-    scrapeGenius(),
-    scrapeKworbShazam(),
-    scrapeKworbSpotify(),
+    appleEnabled ? scrapeAppleCharts() : [],
+    lastfmEnabled ? scrapeLastfm() : { artists: [], tracks: [] },
+    geniusEnabled ? scrapeGenius() : [],
+    shazamEnabled ? scrapeKworbShazam() : [],
+    spotifyGlobalEnabled ? scrapeKworbSpotify() : [],
     tokchartEnabled ? scrapeTokchart().catch(e => { console.warn('[tokchart] failed:', e.message); return []; }) : [],
-    scrapeHypem(),
-    youtubeEnabled  ? scrapeYoutube().catch(e => { console.warn('[youtube] failed:', e.message); return []; }) : [],
+    hypemEnabled ? scrapeHypem() : [],
+    scrapeYoutubeSources(youtubeSources).catch(e => { console.warn('[youtube] failed:', e.message); return []; }),
   ]);
 
   // tiktokResult splits into formatted (for Claude prompt) and raw (for scorer)

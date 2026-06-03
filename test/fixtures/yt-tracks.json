@@ -1,0 +1,4 @@
+{ "contents": { "sectionListRenderer": { "contents": [ { "musicAnalyticsSectionRenderer": { "content": { "trackTypes": [ { "trackViews": [
+  { "name": "Choosin' Texas", "viewCount": "6525533", "artists": [ { "name": "Ella Langley" } ], "chartEntryMetadata": { "currentPosition": 1, "previousPosition": 2 } },
+  { "name": "Second Song", "viewCount": "100", "artists": [ { "name": "Artist Two" }, { "name": "Guest" } ], "chartEntryMetadata": { "currentPosition": 2 } }
+] } ] } } } ] } } }
