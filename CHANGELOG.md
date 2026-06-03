@@ -9,6 +9,8 @@ cut, the Unreleased entries move under that version's heading with the date.
 
 ## [Unreleased]
 
+## [1.7.5] — 2026-06-03
+
 ### Added
 - Deleting a persona now asks whether to also remove its Spotify playlist (it
   gets unfollowed from your library); choose Cancel to keep the playlist.
