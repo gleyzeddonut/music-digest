@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Music Digest — Download &amp; Install</title>
+<!--
+  Drop-in landing / install page for aigora.store.
+  Self-contained: no external CSS or JS, no build step. Paste into a page or
+  host as-is. Update the two download URLs (marked DOWNLOAD-URL) each release.
+  Current build: v1.7.6 (Apple Silicon + Intel). Unsigned — the install steps
+  below cover the macOS Gatekeeper prompt.
+-->
+<style>
+  :root{
+    --bg:#0d0d0f; --panel:#16161a; --line:#26262c;
+    --text:#f3f1ea; --text-2:#b8b4a8; --muted:#6f6c63;
+    --accent:#7ee787; --accent-dim:#3a5f40;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    --mono:"SFMono-Regular",ui-monospace,"JetBrains Mono",Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:var(--serif); line-height:1.55;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:760px; margin:0 auto; padding:64px 24px 96px}
+  .eyebrow{
+    font-family:var(--mono); font-size:12px; letter-spacing:.18em;
+    text-transform:uppercase; color:var(--accent); margin:0 0 18px;
+  }
+  h1{font-size:46px; line-height:1.08; margin:0 0 18px; font-weight:600; letter-spacing:-.01em}
+  h1 em{font-style:italic; color:var(--accent)}
+  .lede{font-size:20px; color:var(--text-2); margin:0 0 40px; max-width:60ch}
+  h2{font-size:13px; font-family:var(--mono); letter-spacing:.14em; text-transform:uppercase;
+     color:var(--muted); margin:48px 0 16px; font-weight:600}
+
+  /* Download */
+  .dl{display:flex; gap:14px; flex-wrap:wrap; margin:0 0 8px}
+  .btn{
+    display:flex; flex-direction:column; gap:2px; text-decoration:none;
+    background:var(--panel); border:1px solid var(--line); border-radius:12px;
+    padding:16px 22px; min-width:230px; transition:border-color .15s, transform .15s;
+  }
+  .btn:hover{border-color:var(--accent-dim); transform:translateY(-1px)}
+  .btn .big{font-family:var(--mono); font-size:15px; color:var(--text); font-weight:600}
+  .btn .small{font-family:var(--mono); font-size:11px; color:var(--muted); letter-spacing:.04em}
+  .btn.primary{background:#14241a; border-color:var(--accent-dim)}
+  .which{font-size:14px; color:var(--muted); margin:14px 0 0}
+  .which code{font-family:var(--mono); color:var(--text-2); font-size:13px}
+
+  /* Steps */
+  ol.steps{counter-reset:s; list-style:none; padding:0; margin:0}
+  ol.steps li{
+    position:relative; padding:0 0 22px 46px; margin:0;
+    border-left:1px solid var(--line); margin-left:14px;
+  }
+  ol.steps li:last-child{border-left-color:transparent}
+  ol.steps li::before{
+    counter-increment:s; content:counter(s);
+    position:absolute; left:-14px; top:-2px;
+    width:28px; height:28px; border-radius:50%;
+    background:var(--panel); border:1px solid var(--line);
+    color:var(--accent); font-family:var(--mono); font-size:13px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  ol.steps li b{color:var(--text)}
+  ol.steps li .note{display:block; color:var(--text-2); font-size:15px; margin-top:4px}
+  code.kbd{
+    font-family:var(--mono); font-size:13px; background:#000; color:var(--accent);
+    padding:3px 8px; border-radius:6px; border:1px solid var(--line);
+    display:inline-block; margin-top:6px; word-break:break-all;
+  }
+  .callout{
+    background:var(--panel); border:1px solid var(--line); border-left:3px solid var(--accent);
+    border-radius:10px; padding:16px 18px; margin:14px 0; font-size:15px; color:var(--text-2);
+  }
+  .callout b{color:var(--text)}
+
+  .features{display:grid; grid-template-columns:1fr 1fr; gap:14px; margin:8px 0}
+  @media(max-width:560px){.features{grid-template-columns:1fr}}
+  .feature{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:18px}
+  .feature .t{font-weight:600; margin:0 0 4px}
+  .feature .d{color:var(--text-2); font-size:15px; margin:0}
+
+  footer{margin-top:64px; padding-top:24px; border-top:1px solid var(--line);
+    color:var(--muted); font-size:13px; font-family:var(--mono)}
+  a{color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <p class="eyebrow">Daily music intelligence · macOS</p>
+  <h1>Wake up to what's <em>actually</em> moving in music.</h1>
+  <p class="lede">
+    Every morning, Music Digest scrapes Reddit, the charts, and the music press,
+    has AI write you a tight brief on the breaking &amp; rising artists, and
+    auto-builds a Spotify playlist of the day's top tracks. It lands in your inbox.
+  </p>
+
+  <!-- ───────── Download ───────── -->
+  <h2>Download</h2>
+  <div class="dl">
+    <!-- DOWNLOAD-URL: update filename each release (GitHub turns spaces into dots) -->
+    <a class="btn primary" href="https://github.com/gleyzeddonut/music-digest/releases/latest/download/Music.Digest-1.7.6-arm64.dmg">
+      <span class="big">Download for Mac</span>
+      <span class="small">Apple Silicon · M1/M2/M3/M4</span>
+    </a>
+    <a class="btn" href="https://github.com/gleyzeddonut/music-digest/releases/latest/download/Music.Digest-1.7.6.dmg">
+      <span class="big">Download for Mac</span>
+      <span class="small">Intel</span>
+    </a>
+  </div>
+  <p class="which">
+    Not sure which?  → Apple menu  > <b>About This Mac</b>. If it says
+    <code>Apple M1/M2/M3/M4</code>, choose Apple Silicon; if it says
+    <code>Intel</code>, choose Intel.
+  </p>
+
+  <!-- ───────── Install ───────── -->
+  <h2>Install (60 seconds)</h2>
+  <ol class="steps">
+    <li>
+      <b>Open the downloaded <code class="kbd">.dmg</code></b> and drag
+      <b>Music Digest</b> onto the <b>Applications</b> folder.
+    </li>
+    <li>
+      <b>In the same window, double-click “Open Music Digest.”</b>
+      <span class="note">
+        This little helper is here on purpose: Music Digest isn't from the App Store,
+        so macOS blocks it on first launch. The helper clears that block and opens
+        the app for you — one double-click, done.
+      </span>
+    </li>
+    <li>
+      <b>That's it — the app opens.</b>
+      <span class="note">From now on, launch it normally from Applications or Spotlight.</span>
+    </li>
+  </ol>
+
+  <div class="callout">
+    <b>If macOS still says the app “can't be opened” or “is damaged”:</b>
+    open the <b>Terminal</b> app and paste this one line, then press Return —
+    it removes the security flag, and the app will open:
+    <br><code class="kbd">xattr -dr com.apple.quarantine "/Applications/Music Digest.app"</code>
+  </div>
+
+  <!-- ───────── After install ───────── -->
+  <h2>First launch</h2>
+  <ol class="steps">
+    <li><b>Enter your name &amp; email</b><span class="note">Your name greets you in the digest; your email is where it gets delivered. No API keys, no payment — it's all handled for you.</span></li>
+    <li><b>Click “Connect Spotify”</b><span class="note">Links your account so the app can build your daily playlist automatically.</span></li>
+    <li><b>Hit ▶ Run Now</b><span class="note">Generates your first digest on the spot. After that it runs every morning on its own.</span></li>
+  </ol>
+
+  <!-- ───────── What you get ───────── -->
+  <h2>What you get</h2>
+  <div class="features">
+    <div class="feature"><p class="t">Daily brief</p><p class="d">An AI-written read on what's moving in music today.</p></div>
+    <div class="feature"><p class="t">Scored artists</p><p class="d">Breaking vs. rising, ranked by real cross-platform signal.</p></div>
+    <div class="feature"><p class="t">Smart playlist</p><p class="d">The day's top tracks, added to Spotify automatically.</p></div>
+    <div class="feature"><p class="t">Monthly recap</p><p class="d">End-of-month rollup: top artist, top song, every trend.</p></div>
+  </div>
+
+  <footer>
+    Music Digest · macOS 11+ · free for early testers.
+    Questions or trouble installing? <a href="mailto:dmgleyzer@gmail.com">Email me</a>.
+  </footer>
+
+</div>
+</body>
+</html>

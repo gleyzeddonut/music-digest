@@ -9,6 +9,18 @@ cut, the Unreleased entries move under that version's heading with the date.
 
 ## [Unreleased]
 
+### Added
+- `docs/install.html` — self-contained download & install/onboarding page for
+  the aigora.store landing (download buttons, Gatekeeper-aware install steps,
+  first-launch walkthrough). Built fresh v1.7.6 DMGs for distribution.
+- Signup-notification trigger: on each new signup (up to the first 25), emails
+  the owner the new user's email so they can be added to the Spotify dev-app
+  allowlist (Spotify caps API access at 25 users). Postgres trigger on
+  `auth.users` → Resend HTTP API via `pg_net`, key read from Vault
+  (`resend_api_key`). Fail-safe — dormant without the key, silent past 25, and
+  errors are swallowed so it can never block a signup. Migrations
+  `20260603130507_enable_pg_net`, `20260603130508_notify_admin_on_signup`.
+
 ## [1.7.6] — 2026-06-03
 
 ### Changed
