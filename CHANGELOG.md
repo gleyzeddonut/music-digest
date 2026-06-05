@@ -9,7 +9,27 @@ cut, the Unreleased entries move under that version's heading with the date.
 
 ## [Unreleased]
 
+### Fixed
+- **Spotify login failed in the packaged app** after the authorize screen. The
+  redirect URI defaulted to port 3001 while the server defaulted to 3000, so the
+  shipped app (which bundles no `.env`) told Spotify to redirect to a dead port.
+  `config.js` now derives the redirect URI from a single `PORT` constant (default
+  3001), so the listen port and redirect port can never diverge.
+
+### Changed
+- macOS distribution is now **code-signed (Developer ID Application) and notarized
+  by Apple**. The DMG opens on a normal double-click — no right-click → Open, no
+  `xattr` Terminal workaround. Removed the `Open Music Digest.command` helper and
+  its README from the DMG; updated `docs/install.html` to the simplified flow.
+  Added `build/entitlements.mac.plist` (hardened runtime) and notarization config
+  (App Store Connect API key via `build/.apple-credentials`).
+
 ### Added
+- **Sign in with Spotify** — a one-tap login option alongside name+email. Uses
+  Supabase Auth's Spotify provider; the same authorization also connects the
+  user's Spotify for playlists, so Spotify users skip the separate "Connect
+  Spotify" step. Email users are unaffected. (Spotify Development Mode still caps
+  Spotify sign-in to whitelisted accounts; non-whitelisted users use email.)
 - `docs/install.html` — self-contained download & install/onboarding page for
   the aigora.store landing (download buttons, Gatekeeper-aware install steps,
   first-launch walkthrough). Built fresh v1.7.6 DMGs for distribution.
