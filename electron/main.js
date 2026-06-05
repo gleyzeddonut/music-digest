@@ -52,6 +52,8 @@ async function handleDeepLink(url) {
     const access_token = params.get('access_token');
     const refresh_token = params.get('refresh_token');
     const expires_in = params.get('expires_in');
+    const provider_token = params.get('provider_token');
+    const provider_refresh_token = params.get('provider_refresh_token');
 
     if (access_token && refresh_token) {
       try {
@@ -59,7 +61,7 @@ async function handleDeepLink(url) {
         await fetch(`http://localhost:${port}/api/auth/session`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ access_token, refresh_token, expires_in }),
+          body: JSON.stringify({ access_token, refresh_token, expires_in, provider_token, provider_refresh_token }),
         });
         if (mainWindow) mainWindow.webContents.reload(); // re-render as signed-in
       } catch (err) {
