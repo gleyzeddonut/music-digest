@@ -55,6 +55,22 @@ async function handleCallback(code) {
   console.log('[spotify] OAuth complete, tokens saved');
 }
 
+// Connect Spotify directly from the provider tokens Supabase returns when a user
+// signs in with Spotify (no separate Connect step). Mirrors handleCallback's
+// token persistence. Spotify only returns a refresh token on the first grant, so
+// keep the stored one when none is supplied.
+function connectFromProviderTokens(accessToken, refreshToken, expiresIn) {
+  if (!accessToken) return false;
+  setSetting('spotify_access_token', accessToken);
+  if (refreshToken) setSetting('spotify_refresh_token', refreshToken);
+  setSetting('spotify_token_expires_at', String(Date.now() + (Number(expiresIn) || 3600) * 1000));
+  // New account/grant — clear playlist IDs so they're re-created under it.
+  getDb().prepare("DELETE FROM settings WHERE key = 'spotify_playlist_id'").run();
+  getDb().prepare("DELETE FROM settings WHERE key LIKE 'spotify_playlist_id_%'").run();
+  console.log('[spotify] Connected via provider tokens from Spotify sign-in');
+  return true;
+}
+
 // ── Authenticated axios instance ──────────────────────────────
 
 async function getAccessToken() {
@@ -261,4 +277,4 @@ async function fetchPlaylistTracks(playlistId) {
   return items;
 }
 
-module.exports = { getAuthUrl, handleCallback, appendSongsToPlaylist, isConnected, getPlaylistUrl, fetchPlaylistTracks, getAccessToken };
+module.exports = { getAuthUrl, handleCallback, connectFromProviderTokens, appendSongsToPlaylist, isConnected, getPlaylistUrl, fetchPlaylistTracks, getAccessToken };
