@@ -139,17 +139,34 @@ router.post('/api/auth/logout', async (req, res) => {
 });
 
 // Establish a session from tokens delivered via the musicdigest:// deep link
-// (email confirmation / password reset). Called by the Electron main process.
+// (email confirmation, password reset, or Sign in with Spotify). Called by the
+// Electron main process. provider_token/provider_refresh_token are present only
+// for Spotify sign-in and also connect Spotify for playlists.
 router.post('/api/auth/session', async (req, res) => {
-  const { access_token, refresh_token, expires_in } = req.body || {};
+  const { access_token, refresh_token, expires_in, provider_token, provider_refresh_token } = req.body || {};
   if (!access_token || !refresh_token) return res.status(400).json({ error: 'Missing tokens' });
   try {
-    const status = await authSession.setSessionFromTokens(access_token, refresh_token, expires_in);
+    const status = await authSession.setSessionFromTokens(
+      access_token, refresh_token, expires_in, provider_token, provider_refresh_token,
+    );
     if (status.authenticated) syncDigestRecipient(status.email);
     res.json(status);
   } catch (err) {
     res.status(400).json({ error: err.message || 'Failed to set session' });
   }
+});
+
+// Build the Supabase "Sign in with Spotify" authorize URL. Scopes match the
+// spotify-proxy grant so the returned provider tokens work for playlist building.
+const SPOTIFY_LOGIN_SCOPES = 'playlist-modify-public playlist-modify-private playlist-read-private streaming user-read-private user-read-email user-modify-playback-state user-read-playback-state';
+router.get('/api/auth/spotify-login/url', (req, res) => {
+  const { url: SUPABASE_URL } = require('../supabase-client');
+  const params = new URLSearchParams({
+    provider: 'spotify',
+    redirect_to: 'musicdigest://auth-callback',
+    scopes: SPOTIFY_LOGIN_SCOPES,
+  });
+  res.json({ url: `${SUPABASE_URL}/auth/v1/authorize?${params}` });
 });
 
 // ── Setup (first-run) ──────────────────────────────────────────
