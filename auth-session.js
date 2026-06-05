@@ -185,7 +185,7 @@ async function restore() {
 // Establish a session directly from tokens delivered by the deep-link callback
 // (musicdigest://auth-callback#access_token=...&refresh_token=...). Looks up the
 // user's email, then persists like any other sign-in.
-async function setSessionFromTokens(accessToken, refreshToken, expiresIn) {
+async function setSessionFromTokens(accessToken, refreshToken, expiresIn, providerToken, providerRefreshToken) {
   if (!accessToken || !refreshToken) return getStatus();
   let email = null;
   try {
@@ -201,6 +201,15 @@ async function setSessionFromTokens(accessToken, refreshToken, expiresIn) {
     email,
   };
   persist();
+  // A Spotify sign-in also yields a Spotify grant — connect it for playlists.
+  // Lazy require avoids the auth-session ↔ spotify circular dependency.
+  if (providerToken) {
+    try {
+      require('./processor/spotify').connectFromProviderTokens(providerToken, providerRefreshToken, expiresIn);
+    } catch (err) {
+      console.warn('[auth] could not connect Spotify from provider tokens:', err.message);
+    }
+  }
   return getStatus();
 }
 
