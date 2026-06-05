@@ -3,7 +3,7 @@
 // there's no active Supabase session. A session is required because every
 // edge-function call (Claude, scrapers, email) now attaches the user's token.
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { api } from './api.js';
 
 export function AuthScreen({ onAuthed }) {
@@ -11,8 +11,13 @@ export function AuthScreen({ onAuthed }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
+  const [spotifyWaiting, setSpotifyWaiting] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const pollRef = useRef(null);
+
+  // Stop polling if the component unmounts mid-Spotify-login.
+  useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
 
   const isSignup = mode === 'signup';
 
@@ -44,13 +49,41 @@ export function AuthScreen({ onAuthed }) {
   }
 
   async function spotifyLogin() {
-    if (busy) return;
+    if (busy || spotifyWaiting) return;
     setError('');
     setNotice('');
     try {
       const url = await api.spotifyLoginUrl();
       window.open(url); // Electron opens external URLs in the default browser
+      // The Spotify OAuth completes in the browser and establishes the session on
+      // the local server via the loopback callback. Poll for it so we advance to
+      // the dashboard on our own — without depending on the browser→app deep-link
+      // refocus, which the OS can block or drop.
+      setSpotifyWaiting(true);
+      setNotice('Waiting for Spotify… finish in your browser, then you can come back here.');
+      if (pollRef.current) clearInterval(pollRef.current);
+      let waited = 0;
+      pollRef.current = setInterval(async () => {
+        waited += 2;
+        try {
+          const st = await api.authStatus();
+          if (st.authenticated) {
+            clearInterval(pollRef.current);
+            pollRef.current = null;
+            setSpotifyWaiting(false);
+            onAuthed();
+            return;
+          }
+        } catch { /* keep polling */ }
+        if (waited >= 180) { // give up after 3 minutes
+          clearInterval(pollRef.current);
+          pollRef.current = null;
+          setSpotifyWaiting(false);
+          setNotice('');
+        }
+      }, 2000);
     } catch (err) {
+      setSpotifyWaiting(false);
       setError(err.message || 'Could not start Spotify sign-in');
     }
   }
@@ -105,11 +138,11 @@ export function AuthScreen({ onAuthed }) {
         </form>
 
         <div className="auth-divider"><span>or</span></div>
-        <button type="button" className="auth-spotify" onClick={spotifyLogin} disabled={busy}>
+        <button type="button" className="auth-spotify" onClick={spotifyLogin} disabled={busy || spotifyWaiting}>
           <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
             <path fill="currentColor" d="M12 2a10 10 0 100 20 10 10 0 000-20zm4.586 14.424a.624.624 0 01-.858.208c-2.35-1.436-5.31-1.76-8.794-.964a.624.624 0 11-.277-1.217c3.81-.87 7.083-.496 9.72 1.115a.624.624 0 01.209.858zm1.223-2.722a.78.78 0 01-1.072.257c-2.69-1.653-6.792-2.132-9.973-1.166a.78.78 0 11-.453-1.493c3.633-1.102 8.153-.568 11.24 1.327a.78.78 0 01.258 1.068zm.105-2.835C14.692 8.95 9.39 8.775 6.29 9.716a.936.936 0 11-.543-1.79c3.558-1.08 9.413-.872 13.122 1.33a.936.936 0 01-.954 1.61z"/>
           </svg>
-          Sign in with Spotify
+          {spotifyWaiting ? 'Waiting for Spotify…' : 'Sign in with Spotify'}
         </button>
 
         <div className="auth-switch">

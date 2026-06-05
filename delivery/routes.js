@@ -251,23 +251,28 @@ function callbackPage(status, message) {
 }
 
 // Shown after a successful "Sign in with Spotify". The session is already set on
-// the local server; navigating to the deep link refocuses the desktop app, which
-// reloads and lands the user signed in.
+// the local server and the app's login screen is polling for it, so it advances
+// to the dashboard on its own. This page just reassures the user and makes a
+// best-effort attempt to bring the desktop app to the front (smooth in the
+// installed app; may prompt in dev). It does NOT auto-close — a vanishing tab
+// left users unsure whether it worked.
 function loginSuccessPage() {
   return `<!DOCTYPE html><html><head><meta charset="utf-8">
 <style>
   body { font-family: -apple-system, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #0a0a0a; color: #e0e0e0; }
-  .box { text-align: center; }
+  .box { text-align: center; max-width: 340px; padding: 0 24px; }
   .icon { font-size: 48px; margin-bottom: 16px; color: #1ed760; }
-  p { margin: 0; font-size: 15px; opacity: 0.7; }
+  h1 { font-size: 19px; margin: 0 0 8px; font-weight: 600; }
+  p { margin: 0; font-size: 14px; line-height: 1.5; opacity: 0.6; }
 </style>
 </head><body><div class="box">
   <div class="icon">✓</div>
-  <p>Signed in! Returning to Music Digest…</p>
+  <h1>You're signed in</h1>
+  <p>Switch back to <b>Music Digest</b> — your dashboard is ready. You can close this tab.</p>
 </div>
 <script>
-  window.location = 'musicdigest://auth-callback';
-  setTimeout(function () { window.close(); }, 1500);
+  // Best-effort refocus of the desktop app. The page stays visible either way.
+  try { window.location = 'musicdigest://auth-callback'; } catch (e) {}
 </script>
 </body></html>`;
 }
