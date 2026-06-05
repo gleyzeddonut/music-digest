@@ -294,6 +294,7 @@ router.get('/auth/spotify', async (req, res) => {
 
 router.get('/auth/spotify/callback', async (req, res) => {
   const { code, error, state } = req.query;
+  console.log('[auth] spotify callback hit — state:', state, 'hasCode:', !!code, 'error:', error || 'none');
   if (error) return res.send(callbackPage('error', `Spotify error: ${error}`));
   try {
     // state=login → "Sign in with Spotify": exchange server-side, establish the
@@ -301,9 +302,11 @@ router.get('/auth/spotify/callback', async (req, res) => {
     if (state === 'login') {
       const config = require('../config');
       const s = await spotifyLoginFn({ action: 'exchange', code, redirect_uri: config.SPOTIFY_REDIRECT_URI });
+      console.log('[auth] spotify-login exchange ok — email:', s.email, 'hasSession:', !!s.access_token);
       const status = await authSession.setSessionFromTokens(
         s.access_token, s.refresh_token, s.expires_in, s.provider_token, s.provider_refresh_token,
       );
+      console.log('[auth] spotify-login session established — authenticated:', status.authenticated, 'email:', status.email);
       if (status.authenticated) syncDigestRecipient(status.email);
       return res.send(loginSuccessPage());
     }
@@ -311,6 +314,7 @@ router.get('/auth/spotify/callback', async (req, res) => {
     await handleCallback(code);
     res.send(callbackPage('success', 'Spotify connected! You can close this tab.'));
   } catch (err) {
+    console.error('[auth] spotify callback error:', err.message);
     res.send(callbackPage('error', err.message));
   }
 });

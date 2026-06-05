@@ -25,11 +25,16 @@ cut, the Unreleased entries move under that version's heading with the date.
   (App Store Connect API key via `build/.apple-credentials`).
 
 ### Added
-- **Sign in with Spotify** — a one-tap login option alongside name+email. Uses
-  Supabase Auth's Spotify provider; the same authorization also connects the
-  user's Spotify for playlists, so Spotify users skip the separate "Connect
-  Spotify" step. Email users are unaffected. (Spotify Development Mode still caps
-  Spotify sign-in to whitelisted accounts; non-whitelisted users use email.)
+- **Sign in with Spotify** — a one-tap login option alongside name+email. A new
+  `spotify-login` edge function runs the Spotify OAuth server-side and provisions
+  a pre-confirmed user (service role), then mints a Supabase session — so email
+  confirmation stays ON for password signups while Spotify users (whose email
+  Spotify never marks "verified") are still let in. The same authorization also
+  connects the user's Spotify for playlists, so Spotify users skip the separate
+  "Connect Spotify" step. Email users are unaffected. (Spotify Development Mode
+  still caps Spotify sign-in to whitelisted accounts; non-whitelisted users use
+  email.) Requires the loopback redirect `http://127.0.0.1:3001/auth/spotify/callback`
+  registered in the Spotify app.
 - `docs/install.html` — self-contained download & install/onboarding page for
   the aigora.store landing (download buttons, Gatekeeper-aware install steps,
   first-launch walkthrough). Built fresh v1.7.6 DMGs for distribution.
