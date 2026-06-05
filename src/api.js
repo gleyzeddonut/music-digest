@@ -21,6 +21,7 @@ export const api = {
   login:         (email, password) => j('/api/auth/login',  { method: 'POST', body: JSON.stringify({ email, password }) }),
   signup:        (email, password) => j('/api/auth/signup', { method: 'POST', body: JSON.stringify({ email, password }) }),
   logout:        ()                => j('/api/auth/logout', { method: 'POST' }),
+  spotifyLoginUrl: ()              => j('/api/auth/spotify-login/url').then(r => r.url),
 
   status:        ()         => j('/api/status'),
   latestDigest:  ()         => j('/api/digest/latest'),

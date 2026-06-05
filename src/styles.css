@@ -2457,6 +2457,25 @@ img { display: block; max-width: 100%; }
 }
 .auth-submit:hover { background: var(--accent-2); }
 .auth-submit:disabled { opacity: 0.6; cursor: default; }
+.auth-divider {
+  display: flex; align-items: center; gap: 12px;
+  margin: 18px 0 14px; color: var(--muted);
+  font-family: var(--f-mono); font-size: 11px; letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.auth-divider::before, .auth-divider::after {
+  content: ""; flex: 1; height: 1px; background: rgba(255, 255, 255, 0.1);
+}
+.auth-spotify {
+  width: 100%;
+  display: flex; align-items: center; justify-content: center; gap: 9px;
+  font-family: var(--f-sans); font-size: 14px; font-weight: 600;
+  color: #08090a; background: var(--accent-2);
+  border: none; border-radius: 9px; padding: 12px; cursor: pointer;
+  transition: background 0.12s, opacity 0.12s;
+}
+.auth-spotify:hover { background: var(--accent); }
+.auth-spotify:disabled { opacity: 0.6; cursor: default; }
 .auth-switch {
   margin-top: 20px;
   text-align: center;

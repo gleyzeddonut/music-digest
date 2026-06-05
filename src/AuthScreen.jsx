@@ -43,6 +43,18 @@ export function AuthScreen({ onAuthed }) {
     }
   }
 
+  async function spotifyLogin() {
+    if (busy) return;
+    setError('');
+    setNotice('');
+    try {
+      const url = await api.spotifyLoginUrl();
+      window.open(url); // Electron opens external URLs in the default browser
+    } catch (err) {
+      setError(err.message || 'Could not start Spotify sign-in');
+    }
+  }
+
   return (
     <div className="auth-screen">
       <div className="auth-card fade-in">
@@ -91,6 +103,14 @@ export function AuthScreen({ onAuthed }) {
             {busy ? 'Working…' : isSignup ? 'Create account' : 'Sign in'}
           </button>
         </form>
+
+        <div className="auth-divider"><span>or</span></div>
+        <button type="button" className="auth-spotify" onClick={spotifyLogin} disabled={busy}>
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+            <path fill="currentColor" d="M12 2a10 10 0 100 20 10 10 0 000-20zm4.586 14.424a.624.624 0 01-.858.208c-2.35-1.436-5.31-1.76-8.794-.964a.624.624 0 11-.277-1.217c3.81-.87 7.083-.496 9.72 1.115a.624.624 0 01.209.858zm1.223-2.722a.78.78 0 01-1.072.257c-2.69-1.653-6.792-2.132-9.973-1.166a.78.78 0 11-.453-1.493c3.633-1.102 8.153-.568 11.24 1.327a.78.78 0 01.258 1.068zm.105-2.835C14.692 8.95 9.39 8.775 6.29 9.716a.936.936 0 11-.543-1.79c3.558-1.08 9.413-.872 13.122 1.33a.936.936 0 01-.954 1.61z"/>
+          </svg>
+          Sign in with Spotify
+        </button>
 
         <div className="auth-switch">
           {isSignup ? 'Already have an account?' : 'New here?'}{' '}
