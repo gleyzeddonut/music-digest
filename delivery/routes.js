@@ -156,17 +156,32 @@ router.post('/api/auth/session', async (req, res) => {
   }
 });
 
-// Build the Supabase "Sign in with Spotify" authorize URL. Scopes match the
-// spotify-proxy grant so the returned provider tokens work for playlist building.
-const SPOTIFY_LOGIN_SCOPES = 'playlist-modify-public playlist-modify-private playlist-read-private streaming user-read-private user-read-email user-modify-playback-state user-read-playback-state';
-router.get('/api/auth/spotify-login/url', (req, res) => {
-  const { url: SUPABASE_URL } = require('../supabase-client');
-  const params = new URLSearchParams({
-    provider: 'spotify',
-    redirect_to: 'musicdigest://auth-callback',
-    scopes: SPOTIFY_LOGIN_SCOPES,
+// Calls the unauthenticated `spotify-login` edge function (no session exists yet
+// at login). It returns the Spotify authorize URL and, on exchange, a minted
+// Supabase session + the Spotify provider tokens.
+async function spotifyLoginFn(body) {
+  const supa = require('../supabase-client');
+  const res = await fetch(`${supa.url}/functions/v1/spotify-login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', apikey: supa.anonKey, Authorization: `Bearer ${supa.anonKey}` },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(15000),
   });
-  res.json({ url: `${SUPABASE_URL}/auth/v1/authorize?${params}` });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `spotify-login ${res.status}`);
+  return data;
+}
+
+// "Sign in with Spotify" authorize URL (state=login → handled by the callback's
+// login branch). Uses the loopback redirect already registered in Spotify.
+router.get('/api/auth/spotify-login/url', async (req, res) => {
+  try {
+    const config = require('../config');
+    const { url } = await spotifyLoginFn({ action: 'auth-url', redirect_uri: config.SPOTIFY_REDIRECT_URI });
+    res.json({ url });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ── Setup (first-run) ──────────────────────────────────────────
@@ -235,6 +250,28 @@ function callbackPage(status, message) {
 </body></html>`;
 }
 
+// Shown after a successful "Sign in with Spotify". The session is already set on
+// the local server; navigating to the deep link refocuses the desktop app, which
+// reloads and lands the user signed in.
+function loginSuccessPage() {
+  return `<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>
+  body { font-family: -apple-system, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #0a0a0a; color: #e0e0e0; }
+  .box { text-align: center; }
+  .icon { font-size: 48px; margin-bottom: 16px; color: #1ed760; }
+  p { margin: 0; font-size: 15px; opacity: 0.7; }
+</style>
+</head><body><div class="box">
+  <div class="icon">✓</div>
+  <p>Signed in! Returning to Music Digest…</p>
+</div>
+<script>
+  window.location = 'musicdigest://auth-callback';
+  setTimeout(function () { window.close(); }, 1500);
+</script>
+</body></html>`;
+}
+
 // Returns the Spotify auth URL as JSON so the frontend can open it externally
 router.get('/auth/spotify/url', async (req, res) => {
   try {
@@ -256,9 +293,21 @@ router.get('/auth/spotify', async (req, res) => {
 });
 
 router.get('/auth/spotify/callback', async (req, res) => {
-  const { code, error } = req.query;
+  const { code, error, state } = req.query;
   if (error) return res.send(callbackPage('error', `Spotify error: ${error}`));
   try {
+    // state=login → "Sign in with Spotify": exchange server-side, establish the
+    // Supabase session, and connect Spotify for playlists in one shot.
+    if (state === 'login') {
+      const config = require('../config');
+      const s = await spotifyLoginFn({ action: 'exchange', code, redirect_uri: config.SPOTIFY_REDIRECT_URI });
+      const status = await authSession.setSessionFromTokens(
+        s.access_token, s.refresh_token, s.expires_in, s.provider_token, s.provider_refresh_token,
+      );
+      if (status.authenticated) syncDigestRecipient(status.email);
+      return res.send(loginSuccessPage());
+    }
+    // Otherwise it's the playlist-connect flow (requires an existing session).
     await handleCallback(code);
     res.send(callbackPage('success', 'Spotify connected! You can close this tab.'));
   } catch (err) {

@@ -69,7 +69,14 @@ async function handleDeepLink(url) {
       }
     } else {
       const errDesc = params.get('error_description') || params.get('error');
-      if (errDesc) console.warn('[deeplink] auth error in callback:', errDesc);
+      if (errDesc) {
+        console.warn('[deeplink] auth error in callback:', errDesc);
+      } else if (mainWindow) {
+        // No tokens, no error → "Sign in with Spotify": the session was already
+        // established on the local server via the loopback callback. Reload so
+        // the renderer re-renders as signed in.
+        mainWindow.webContents.reload();
+      }
     }
     showWindow();
   } catch (err) {

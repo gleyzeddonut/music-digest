@@ -21,3 +21,9 @@ site_url = "http://localhost:3000"
 # NOTE: the hosted project also needs this added under
 # Auth → URL Configuration → Redirect URLs in the Supabase dashboard.
 additional_redirect_urls = ["musicdigest://auth-callback"]
+
+# "Sign in with Spotify" runs before any session exists, so it must be callable
+# without a JWT. It provisions a pre-confirmed user and mints a session itself;
+# the single-use Spotify auth code is the real gate. Deploy with verify_jwt=false.
+[functions.spotify-login]
+verify_jwt = false
