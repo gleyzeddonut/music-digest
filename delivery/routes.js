@@ -309,7 +309,7 @@ router.get('/auth/spotify/callback', async (req, res) => {
       const s = await spotifyLoginFn({ action: 'exchange', code, redirect_uri: config.SPOTIFY_REDIRECT_URI });
       console.log('[auth] spotify-login exchange ok — email:', s.email, 'hasSession:', !!s.access_token);
       const status = await authSession.setSessionFromTokens(
-        s.access_token, s.refresh_token, s.expires_in, s.provider_token, s.provider_refresh_token,
+        s.access_token, s.refresh_token, s.expires_in, s.provider_token, s.provider_refresh_token, s.provider_expires_in,
       );
       console.log('[auth] spotify-login session established — authenticated:', status.authenticated, 'email:', status.email);
       if (status.authenticated) {

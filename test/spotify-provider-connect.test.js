@@ -38,18 +38,19 @@ const spotify = require('../processor/spotify');
 const get = (k) => store.get(k);
 
 (function run() {
-  // A stale playlist id from a previous account must be cleared on connect.
-  store.set('spotify_playlist_id', 'OLD');
-  store.set('spotify_playlist_id_2', 'OLD2');
+  // An existing playlist linkage must SURVIVE a re-login (clearing it would spawn
+  // a duplicate playlist every time the user signs in again).
+  store.set('spotify_playlist_id', 'KEEP');
+  store.set('spotify_playlist_id_2', 'KEEP2');
 
   const ok = spotify.connectFromProviderTokens('ACCESS_X', 'REFRESH_X', 3600);
   assert.strictEqual(ok, true, 'returns true when an access token is provided');
   assert.strictEqual(get('spotify_access_token'), 'ACCESS_X');
   assert.strictEqual(get('spotify_refresh_token'), 'REFRESH_X');
   assert.ok(Number(get('spotify_token_expires_at')) > Date.now(), 'expiry is in the future');
-  assert.strictEqual(get('spotify_playlist_id'), undefined, 'stale global playlist id cleared');
-  assert.strictEqual(get('spotify_playlist_id_2'), undefined, 'stale per-persona playlist id cleared');
-  console.log('✓ persists tokens and clears stale playlist ids');
+  assert.strictEqual(get('spotify_playlist_id'), 'KEEP', 'existing global playlist id preserved');
+  assert.strictEqual(get('spotify_playlist_id_2'), 'KEEP2', 'existing per-persona playlist id preserved');
+  console.log('✓ persists tokens and preserves existing playlist linkage');
 
   // Spotify omits the refresh token on re-auth — keep the stored one.
   const ok2 = spotify.connectFromProviderTokens('ACCESS_Y', null, 3600);

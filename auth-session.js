@@ -185,7 +185,7 @@ async function restore() {
 // Establish a session directly from tokens delivered by the deep-link callback
 // (musicdigest://auth-callback#access_token=...&refresh_token=...). Looks up the
 // user's email, then persists like any other sign-in.
-async function setSessionFromTokens(accessToken, refreshToken, expiresIn, providerToken, providerRefreshToken) {
+async function setSessionFromTokens(accessToken, refreshToken, expiresIn, providerToken, providerRefreshToken, providerExpiresIn) {
   if (!accessToken || !refreshToken) return getStatus();
   let email = null;
   try {
@@ -205,7 +205,8 @@ async function setSessionFromTokens(accessToken, refreshToken, expiresIn, provid
   // Lazy require avoids the auth-session ↔ spotify circular dependency.
   if (providerToken) {
     try {
-      require('./processor/spotify').connectFromProviderTokens(providerToken, providerRefreshToken, expiresIn);
+      // Use the Spotify token's own lifetime, not the Supabase session's.
+      require('./processor/spotify').connectFromProviderTokens(providerToken, providerRefreshToken, providerExpiresIn || expiresIn);
     } catch (err) {
       console.warn('[auth] could not connect Spotify from provider tokens:', err.message);
     }

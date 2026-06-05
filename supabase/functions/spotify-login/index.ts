@@ -116,6 +116,7 @@ Deno.serve(async (req) => {
         expires_in:             session.expires_in,
         provider_token:         tok.access_token,
         provider_refresh_token: tok.refresh_token ?? null,
+        provider_expires_in:    tok.expires_in ?? null,
         email,
       })
     }

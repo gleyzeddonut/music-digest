@@ -64,9 +64,10 @@ function connectFromProviderTokens(accessToken, refreshToken, expiresIn) {
   setSetting('spotify_access_token', accessToken);
   if (refreshToken) setSetting('spotify_refresh_token', refreshToken);
   setSetting('spotify_token_expires_at', String(Date.now() + (Number(expiresIn) || 3600) * 1000));
-  // New account/grant — clear playlist IDs so they're re-created under it.
-  getDb().prepare("DELETE FROM settings WHERE key = 'spotify_playlist_id'").run();
-  getDb().prepare("DELETE FROM settings WHERE key LIKE 'spotify_playlist_id_%'").run();
+  // Do NOT clear stored playlist IDs: a returning user signing in again must keep
+  // their existing playlist (clearing it spawns a duplicate on every re-login).
+  // getOrCreatePlaylist already detects an account change (playlist-owner
+  // mismatch) and recreates only when the account actually differs.
   console.log('[spotify] Connected via provider tokens from Spotify sign-in');
   return true;
 }
