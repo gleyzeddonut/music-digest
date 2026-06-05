@@ -251,11 +251,10 @@ function callbackPage(status, message) {
 }
 
 // Shown after a successful "Sign in with Spotify". The session is already set on
-// the local server and the app's login screen is polling for it, so it advances
-// to the dashboard on its own. This page just reassures the user and makes a
-// best-effort attempt to bring the desktop app to the front (smooth in the
-// installed app; may prompt in dev). It does NOT auto-close — a vanishing tab
-// left users unsure whether it worked.
+// the local server (the app's login screen polls for it and advances to the
+// dashboard), and the main process has pulled the app to the foreground. This
+// page just confirms success, then closes itself so the user is left looking at
+// the app, not a stray tab.
 function loginSuccessPage() {
   return `<!DOCTYPE html><html><head><meta charset="utf-8">
 <style>
@@ -268,11 +267,12 @@ function loginSuccessPage() {
 </head><body><div class="box">
   <div class="icon">✓</div>
   <h1>You're signed in</h1>
-  <p>Switch back to <b>Music Digest</b> — your dashboard is ready. You can close this tab.</p>
+  <p>Returning you to Music Digest…</p>
 </div>
 <script>
-  // Best-effort refocus of the desktop app. The page stays visible either way.
-  try { window.location = 'musicdigest://auth-callback'; } catch (e) {}
+  // The app has already been brought to the front; close this tab behind it.
+  // (If the browser blocks programmatic close, the message remains as a fallback.)
+  setTimeout(function () { try { window.close(); } catch (e) {} }, 1200);
 </script>
 </body></html>`;
 }
@@ -312,7 +312,11 @@ router.get('/auth/spotify/callback', async (req, res) => {
         s.access_token, s.refresh_token, s.expires_in, s.provider_token, s.provider_refresh_token,
       );
       console.log('[auth] spotify-login session established — authenticated:', status.authenticated, 'email:', status.email);
-      if (status.authenticated) syncDigestRecipient(status.email);
+      if (status.authenticated) {
+        syncDigestRecipient(status.email);
+        // Pull the desktop app to the foreground over the browser (Electron only).
+        if (global.__focusApp) { try { global.__focusApp(); } catch (_) {} }
+      }
       return res.send(loginSuccessPage());
     }
     // Otherwise it's the playlist-connect flow (requires an existing session).

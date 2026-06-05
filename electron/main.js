@@ -38,6 +38,15 @@ function showWindow() {
   mainWindow.focus();
 }
 
+// Exposed so the in-process server (the Spotify-login loopback callback) can pull
+// the desktop app to the foreground OVER the browser once the session is set —
+// app.focus({steal}) is what raises us above the active browser on macOS. This
+// avoids the flaky browser→app deep-link prompt for refocus.
+global.__focusApp = function () {
+  showWindow();
+  try { app.focus({ steal: true }); } catch (_) { /* best effort */ }
+};
+
 // ── Deep links (musicdigest://) ───────────────────────────────
 // Confirmation / password-reset emails redirect to
 //   musicdigest://auth-callback#access_token=…&refresh_token=…
