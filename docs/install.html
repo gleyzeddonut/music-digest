@@ -8,8 +8,8 @@
   Drop-in landing / install page for aigora.store.
   Self-contained: no external CSS or JS, no build step. Paste into a page or
   host as-is. Update the two download URLs (marked DOWNLOAD-URL) each release.
-  Current build: v1.7.6 (Apple Silicon + Intel). Unsigned — the install steps
-  below cover the macOS Gatekeeper prompt.
+  Current build: v1.7.6 (Apple Silicon + Intel). Signed with a Developer ID and
+  notarized by Apple — opens on a normal double-click, no Gatekeeper workaround.
 -->
 <style>
   :root{
@@ -121,32 +121,24 @@
   </p>
 
   <!-- ───────── Install ───────── -->
-  <h2>Install (60 seconds)</h2>
+  <h2>Install (30 seconds)</h2>
   <ol class="steps">
     <li>
       <b>Open the downloaded <code class="kbd">.dmg</code></b> and drag
       <b>Music Digest</b> onto the <b>Applications</b> folder.
     </li>
     <li>
-      <b>In the same window, double-click “Open Music Digest.”</b>
+      <b>Double-click Music Digest to launch it.</b>
       <span class="note">
-        This little helper is here on purpose: Music Digest isn't from the App Store,
-        so macOS blocks it on first launch. The helper clears that block and opens
-        the app for you — one double-click, done.
+        It's signed with an Apple Developer ID and notarized by Apple, so it
+        opens like any other app — no security prompts, no extra steps.
       </span>
     </li>
     <li>
       <b>That's it — the app opens.</b>
-      <span class="note">From now on, launch it normally from Applications or Spotlight.</span>
+      <span class="note">Launch it any time from Applications or Spotlight.</span>
     </li>
   </ol>
-
-  <div class="callout">
-    <b>If macOS still says the app “can't be opened” or “is damaged”:</b>
-    open the <b>Terminal</b> app and paste this one line, then press Return —
-    it removes the security flag, and the app will open:
-    <br><code class="kbd">xattr -dr com.apple.quarantine "/Applications/Music Digest.app"</code>
-  </div>
 
   <!-- ───────── After install ───────── -->
   <h2>First launch</h2>

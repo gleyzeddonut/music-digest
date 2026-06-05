@@ -10,3 +10,8 @@ npm-debug.log*
 out/
 supabase/.temp/
 .auth.json
+
+# Apple code-signing / notarization secrets — never commit
+build/.apple-credentials
+build/*.p8
+*.p12

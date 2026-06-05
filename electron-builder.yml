@@ -15,8 +15,18 @@ directories:
 mac:
   category: public.app-category.music
   icon: assets/icon.icns
-  # Unsigned distribution — recipients right-click → Open on first launch
-  identity: null
+  # Signed + notarized distribution. electron-builder auto-discovers the
+  # "Developer ID Application" cert in the keychain; hardened runtime +
+  # entitlements are required for notarization. App opens on a normal
+  # double-click — no Gatekeeper workaround needed.
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  # Notarize via App Store Connect API key. Reads APPLE_API_KEY,
+  # APPLE_API_KEY_ID and APPLE_API_ISSUER from the environment (see .env.example).
+  notarize:
+    teamId: W7T5PX7TS9
   target:
     - target: dmg
       arch: [x64, arm64]
@@ -34,14 +44,6 @@ dmg:
       y: 180
       type: link
       path: /Applications
-    - x: 130
-      y: 310
-      type: file
-      path: build/Open Music Digest.command
-    - x: 410
-      y: 310
-      type: file
-      path: build/README.rtf
 
 # NOTE: .env is intentionally NOT bundled. All credentials (email/SMTP, API
 # keys) live server-side in Supabase edge functions; the app only carries the

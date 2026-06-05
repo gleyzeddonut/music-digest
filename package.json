@@ -14,7 +14,7 @@
     "build:ui": "vite build",
     "start": "npm run build:ui && node index.js",
     "electron": "electron-rebuild -f -w better-sqlite3 && codesign --sign - --force node_modules/better-sqlite3/build/Release/better_sqlite3.node && electron .",
-    "dist": "npm run build:ui && electron-builder --mac"
+    "dist": "npm run build:ui && bash -c 'set -a; [ -f build/.apple-credentials ] && source build/.apple-credentials; set +a; electron-builder --mac'"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.30.0",
