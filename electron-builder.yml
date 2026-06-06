@@ -26,7 +26,7 @@ mac:
   # Notarize via App Store Connect API key. Reads APPLE_API_KEY,
   # APPLE_API_KEY_ID and APPLE_API_ISSUER from the environment (see .env.example).
   notarize:
-    teamId: W7T5PX7TS9
+    teamId: K7VM2MP885
   target:
     - target: dmg
       arch: [x64, arm64]
