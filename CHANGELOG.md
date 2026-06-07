@@ -9,6 +9,8 @@ cut, the Unreleased entries move under that version's heading with the date.
 
 ## [Unreleased]
 
+## [1.7.7] — 2026-06-06
+
 ### Fixed
 - **Spotify login failed in the packaged app** after the authorize screen. The
   redirect URI defaulted to port 3001 while the server defaulted to 3000, so the
@@ -37,7 +39,7 @@ cut, the Unreleased entries move under that version's heading with the date.
   registered in the Spotify app.
 - `docs/install.html` — self-contained download & install/onboarding page for
   the aigora.store landing (download buttons, Gatekeeper-aware install steps,
-  first-launch walkthrough). Built fresh v1.7.6 DMGs for distribution.
+  first-launch walkthrough). Built fresh signed + notarized DMGs for distribution.
 - Signup-notification trigger: on each new signup (up to the first 25), emails
   the owner the new user's email so they can be added to the Spotify dev-app
   allowlist (Spotify caps API access at 25 users). Postgres trigger on
