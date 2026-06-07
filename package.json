@@ -2,6 +2,7 @@
   "name": "music-digest",
   "version": "1.7.7",
   "description": "Daily music buzz digest — scrape, summarize, playlist, deliver",
+  "author": "Daniel Gleyzer <dmgleyzer@gmail.com>",
   "repository": {
     "type": "git",
     "url": "https://github.com/gleyzeddonut/music-digest.git"

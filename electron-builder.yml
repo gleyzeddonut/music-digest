@@ -23,10 +23,10 @@ mac:
   gatekeeperAssess: false
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
-  # Notarize via App Store Connect API key. Reads APPLE_API_KEY,
-  # APPLE_API_KEY_ID and APPLE_API_ISSUER from the environment (see .env.example).
-  notarize:
-    teamId: K7VM2MP885
+  # Notarize via App Store Connect API key. Reads APPLE_API_KEY, APPLE_API_KEY_ID,
+  # APPLE_API_ISSUER and APPLE_TEAM_ID from the environment (see
+  # build/.apple-credentials, sourced by the `dist` script).
+  notarize: true
   target:
     - target: dmg
       arch: [x64, arm64]
