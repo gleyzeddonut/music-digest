@@ -290,6 +290,17 @@ img { display: block; max-width: 100%; }
 .persona-ctx-delete { color: #f0666b; }
 .persona-ctx-delete:hover { background: rgba(240,102,107,.1); color: #f0666b; }
 
+/* Scrollable middle of the sidebar: brand/persona stay pinned above, the
+   Spotify pill below — nav groups scroll instead of being squeezed/clipped
+   when they outgrow the window. */
+.sidebar-nav {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-top: 8px;
+}
+.brand, .persona-switcher, .sidebar-bottom { flex-shrink: 0; }
+
 .nav-group { padding: 0 14px 18px; }
 .nav-group + .nav-group { padding-top: 18px; border-top: 1px solid var(--line-soft); }
 .nav-label {

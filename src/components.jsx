@@ -293,6 +293,7 @@ function Sidebar({ route, onNavigate, spotifyConnected, personas = [], activePer
         )}
       </div>
 
+      <div className="sidebar-nav">
       <NavGroup label="Daily">
         <NavItem id="digest" label="Today"     icon="today" route={route} onNavigate={onNavigate} />
         <NavItem id="brief"  label="The Brief" icon="brief" route={route} onNavigate={onNavigate} />
@@ -329,6 +330,7 @@ function Sidebar({ route, onNavigate, spotifyConnected, personas = [], activePer
           </div>
         ))}
       </NavGroup>
+      </div>
 
       <div className="sidebar-bottom">
         {updateInfo && (
