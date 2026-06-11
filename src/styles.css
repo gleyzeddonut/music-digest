@@ -303,6 +303,24 @@ img { display: block; max-width: 100%; }
   margin-bottom: 8px;
 }
 
+/* Foldable group headers */
+.nav-label-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+}
+.nav-label-toggle:hover { color: var(--text-2); }
+.nav-fold-chevron {
+  display: flex;
+  opacity: 0;
+  transition: transform 0.15s, opacity 0.12s;
+}
+.nav-group:hover .nav-fold-chevron { opacity: 0.6; }
+.nav-group.collapsed .nav-fold-chevron { transform: rotate(-90deg); opacity: 0.6; }
+.nav-group.collapsed .nav-label { margin-bottom: 0; }
+
 .nav-item {
   display: flex;
   align-items: center;

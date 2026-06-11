@@ -109,6 +109,26 @@ function NavItem({ id, label, icon, route, onNavigate }) {
   );
 }
 
+// Collapsible sidebar group. Collapsed state persists per-label across sessions.
+function NavGroup({ label, children }) {
+  const [collapsed, setCollapsed] = React.useState(
+    () => localStorage.getItem(`nav_collapsed_${label}`) === '1'
+  );
+  const toggle = () => setCollapsed(c => {
+    localStorage.setItem(`nav_collapsed_${label}`, c ? '0' : '1');
+    return !c;
+  });
+  return (
+    <div className={`nav-group${collapsed ? ' collapsed' : ''}`}>
+      <div className="nav-label nav-label-toggle" onClick={toggle}>
+        <span>{label}</span>
+        <span className="nav-fold-chevron"><Icon name="chevron" size={11} /></span>
+      </div>
+      {!collapsed && children}
+    </div>
+  );
+}
+
 // Nav item for a section of the Today page (Artists, Songs): navigates to the
 // digest, then scrolls to the section once it has rendered.
 function SectionNavItem({ label, icon, targetId, onNavigate }) {
@@ -273,23 +293,20 @@ function Sidebar({ route, onNavigate, spotifyConnected, personas = [], activePer
         )}
       </div>
 
-      <div className="nav-group">
-        <div className="nav-label">Daily</div>
+      <NavGroup label="Daily">
         <NavItem id="digest" label="Today"     icon="today" route={route} onNavigate={onNavigate} />
         <NavItem id="brief"  label="The Brief" icon="brief" route={route} onNavigate={onNavigate} />
         <SectionNavItem label="Artists" icon="artists" targetId="digest-artists" onNavigate={onNavigate} />
         <SectionNavItem label="Songs"   icon="songs"   targetId="digest-songs"   onNavigate={onNavigate} />
-      </div>
+      </NavGroup>
 
-      <div className="nav-group">
-        <div className="nav-label">Archive</div>
+      <NavGroup label="Archive">
         <NavItem id="monthly" label="This Month" icon="monthly" route={route} onNavigate={onNavigate} />
         <NavItem id="history" label="History"    icon="history" route={route} onNavigate={onNavigate} />
         <NavItem id="sources" label="Sources"    icon="sources" route={route} onNavigate={onNavigate} />
-      </div>
+      </NavGroup>
 
-      <div className="nav-group">
-        <div className="nav-label">Library</div>
+      <NavGroup label="Library">
         {/* Main playlist (shared default) — clicking switches back to the default
             persona so the Playlist view shows the shared playlist. */}
         <div
@@ -311,7 +328,7 @@ function Sidebar({ route, onNavigate, spotifyConnected, personas = [], activePer
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.playlistName}</span>
           </div>
         ))}
-      </div>
+      </NavGroup>
 
       <div className="sidebar-bottom">
         {updateInfo && (

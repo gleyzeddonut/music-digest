@@ -13,7 +13,9 @@ cut, the Unreleased entries move under that version's heading with the date.
 - **Sidebar reorganized**: "Daily" now holds Today, The Brief, Artists, and
   Songs (Artists/Songs jump to their section of the Today page); a new
   "Archive" group holds This Month, History, and Sources. Added person and
-  music-note icons for the new entries.
+  music-note icons for the new entries. All sidebar groups (Daily, Archive,
+  Library) are now **foldable** — click the group header to collapse/expand
+  (chevron appears on hover); collapsed state is remembered across sessions.
 
 ## [1.7.8] — 2026-06-10
 
