@@ -294,6 +294,11 @@ function Sidebar({ route, onNavigate, spotifyConnected, personas = [], activePer
       </div>
 
       <div className="sidebar-nav">
+      {/* Standalone, above all groups */}
+      <div className="nav-group">
+        <NavItem id="sources" label="Sources" icon="sources" route={route} onNavigate={onNavigate} />
+      </div>
+
       <NavGroup label="Daily">
         <NavItem id="digest" label="Today"     icon="today" route={route} onNavigate={onNavigate} />
         <NavItem id="brief"  label="The Brief" icon="brief" route={route} onNavigate={onNavigate} />
@@ -304,7 +309,6 @@ function Sidebar({ route, onNavigate, spotifyConnected, personas = [], activePer
       <NavGroup label="Archive">
         <NavItem id="monthly" label="This Month" icon="monthly" route={route} onNavigate={onNavigate} />
         <NavItem id="history" label="History"    icon="history" route={route} onNavigate={onNavigate} />
-        <NavItem id="sources" label="Sources"    icon="sources" route={route} onNavigate={onNavigate} />
       </NavGroup>
 
       <NavGroup label="Library">
