@@ -1,6 +1,7 @@
 const { app, BrowserWindow, Tray, Menu, nativeImage, shell, globalShortcut, MenuItem } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { initAutoUpdater } = require('./updater');
 
 let mainWindow = null;
 let tray = null;
@@ -237,6 +238,7 @@ if (!gotLock) {
     buildAppMenu();
     createWindow();
     createTray();
+    initAutoUpdater({ onBeforeRestart: () => { isQuitting = true; } });
 
     // Dev shortcuts (unpackaged only)
     if (!app.isPackaged) {

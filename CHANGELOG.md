@@ -9,6 +9,30 @@ cut, the Unreleased entries move under that version's heading with the date.
 
 ## [Unreleased]
 
+## [1.7.8] — 2026-06-10
+
+### Added
+- **In-app auto-update** via `electron-updater` + GitHub Releases. The packaged
+  app checks for updates on launch and every 4 hours, downloads them in the
+  background (differential — only changed blocks), and prompts "Restart Now /
+  Later"; "Later" still installs on next quit. Build now also produces ZIP
+  targets (what Squirrel.Mac installs from; the DMG remains for first-time
+  installs) and `latest-mac.yml` as the update feed. New `npm run release`
+  script builds, signs, notarizes and uploads all artifacts to a GitHub release
+  (`GH_TOKEN` or `gh auth token`). Users on ≤1.7.7 need one final manual
+  download; from then on updates are automatic.
+
+### Changed
+- **Releases are now cut locally** with `npm run release` (signing/notarization
+  credentials live only on the dev machine). Removed `.github/workflows/release.yml`:
+  it built **unsigned** DMGs on every `v*` tag and published them with
+  `--publish always` — for v1.7.7 those briefly overwrote the signed local
+  build on the GitHub release until the signed assets were re-uploaded. With
+  auto-update live, an unsigned `latest-mac.yml` winning that race would break
+  updates for every installed app (Squirrel.Mac rejects unsigned builds), so
+  the CI publish path is gone. The workflow's original reason (local `dmgbuild`
+  failing on Python 3.14) no longer reproduces — v1.7.7 DMGs built fine locally.
+
 ## [1.7.7] — 2026-06-06
 
 ### Fixed

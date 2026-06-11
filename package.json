@@ -1,6 +1,6 @@
 {
   "name": "music-digest",
-  "version": "1.7.7",
+  "version": "1.7.8",
   "description": "Daily music buzz digest — scrape, summarize, playlist, deliver",
   "author": "Daniel Gleyzer <dmgleyzer@gmail.com>",
   "repository": {
@@ -15,7 +15,8 @@
     "build:ui": "vite build",
     "start": "npm run build:ui && node index.js",
     "electron": "electron-rebuild -f -w better-sqlite3 && codesign --sign - --force node_modules/better-sqlite3/build/Release/better_sqlite3.node && electron .",
-    "dist": "npm run build:ui && bash -c 'set -a; [ -f build/.apple-credentials ] && source build/.apple-credentials; set +a; electron-builder --mac'"
+    "dist": "npm run build:ui && bash -c 'set -a; [ -f build/.apple-credentials ] && source build/.apple-credentials; set +a; electron-builder --mac'",
+    "release": "npm run build:ui && bash -c 'set -a; [ -f build/.apple-credentials ] && source build/.apple-credentials; set +a; export GH_TOKEN=\"${GH_TOKEN:-$(gh auth token)}\"; electron-builder --mac --publish always'"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.30.0",
@@ -23,6 +24,7 @@
     "better-sqlite3": "^12.9.0",
     "cheerio": "^1.0.0",
     "dotenv": "^16.4.0",
+    "electron-updater": "^6.8.9",
     "express": "^4.19.0",
     "node-cron": "^4.2.1",
     "nodemailer": "^8.0.6",

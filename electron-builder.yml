@@ -27,9 +27,20 @@ mac:
   # APPLE_API_ISSUER and APPLE_TEAM_ID from the environment (see
   # build/.apple-credentials, sourced by the `dist` script).
   notarize: true
+  # DMG for first-time installs; ZIP is what electron-updater (Squirrel.Mac)
+  # actually downloads and installs for auto-updates.
   target:
     - target: dmg
       arch: [x64, arm64]
+    - target: zip
+      arch: [x64, arm64]
+
+# Auto-update feed. `npm run release` uploads the DMG/ZIPs, blockmaps and
+# latest-mac.yml to a GitHub release; the app polls that feed via electron-updater.
+publish:
+  provider: github
+  owner: gleyzeddonut
+  repo: music-digest
 
 dmg:
   title: Music Digest
