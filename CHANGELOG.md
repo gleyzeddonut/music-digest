@@ -10,6 +10,12 @@ cut, the Unreleased entries move under that version's heading with the date.
 ## [Unreleased]
 
 ### Changed
+- **Polish pass v2** (updated design handoff): softer "new OS" corner radii
+  across every surface (sidebar, cards, menus, modals, inputs — pills and
+  circles untouched), including the inline-styled inputs in Sources/Settings
+  add-forms and Onboarding; Monthly hero divider softened to match the calmer
+  hairline system; signal badge/tooltip radii bumped to match. Song-row corner
+  rounding adjusted to the new 18px container frame.
 - **Updates are now user-initiated, not automatic.** The app no longer
   downloads updates or shows a restart dialog on its own — it only checks
   availability. Clicking the sidebar "Update to vX" pill is what installs:

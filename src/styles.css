@@ -2663,6 +2663,11 @@ img { display: block; max-width: 100%; }
 /* (Settings .set-row already uses --line-soft with a clean :last-child — no
    change needed there.) */
 
+/* Monthly recap hero used a full-strength --line divider; soften it to match
+   the calmer system used everywhere else.
+   Original: .monthly-hero { … border-bottom: 1px solid var(--line); }            (~L1029) */
+.monthly-hero { border-bottom-color: var(--line-soft); }
+
 
 /* ── 5 · SONG SIGNAL BADGE ───────────────────────────────────────────────────
    Styles for the new hover-reveal signal control that replaces the row of
@@ -2677,7 +2682,7 @@ img { display: block; max-width: 100%; }
   align-items: center;
   gap: 6px;
   padding: 4px 7px;
-  border-radius: 7px;
+  border-radius: 10px;
   color: var(--muted);
   cursor: default;
   transition: color 0.12s, background 0.12s;
@@ -2695,7 +2700,7 @@ img { display: block; max-width: 100%; }
   min-width: 138px;
   background: var(--bg-elev);
   border: 1px solid var(--line);
-  border-radius: 9px;
+  border-radius: 13px;
   padding: 9px 11px 10px;
   box-shadow: 0 14px 36px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.04);
   opacity: 0;
@@ -2746,8 +2751,78 @@ img { display: block; max-width: 100%; }
 /* allow the tooltip to escape the rounded songs container */
 .songs { overflow: visible; }
 
-/* With .songs overflow now visible (for the signal tooltip), the container no
+
+/* ── 6 · ROUNDED — softer "new OS" corners (optional, drop this section to skip)
+   Concentric step-up so larger surfaces read proportionally rounder. Circles
+   (50%), pills (999px) and thin 2px tracks are deliberately left untouched.
+   Step map:  4→6  5→7  6→8  7→10  8→11  9→12  10→14  11→14  12→16  14→18  18→26
+   Every selector below already carries the smaller radius in styles.css; these
+   just bump them. */
+
+/* sidebar */
+.persona-trigger { border-radius: 14px; }   /* was 11 */
+.eq-swatch       { border-radius: 10px; }    /* was 9  */
+.nav-item        { border-radius: 10px; }    /* was 7  */
+.spotify-pill    { border-radius: 12px; }    /* was 9  */
+
+/* top bar */
+.search    { border-radius: 11px; }          /* was 8  */
+.icon-btn  { border-radius: 11px; }          /* was 8  */
+.kbd       { border-radius: 6px; }           /* was 4  */
+
+/* hero + content cards */
+.hero            { border-radius: 26px; }    /* was 18 */
+.brief           { border-radius: 18px; }    /* was 14 */
+.artist-card     { border-radius: 16px; }    /* was 12 */
+.artist-portrait { border-radius: 14px; }    /* was 10 */
+.songs           { border-radius: 18px; }    /* was 14 */
+.song .cover     { border-radius: 8px; }     /* was 6  */
+.meta-cell .chip { border-radius: 6px; }     /* was 4  */
+
+/* History */
+.hist-thumb        { border-radius: 7px; }   /* was 5  */
+.hist-row-selected { border-radius: 8px; }   /* was 6  */
+
+/* Sources */
+.btn-primary  { border-radius: 10px; }       /* was 7  */
+.src-type-tag { border-radius: 6px; }        /* was 4  */
+.src-row .del { border-radius: 7px; }        /* was 5  */
+.src-row:first-child { border-top-left-radius: 11px; border-top-right-radius: 11px; }     /* was 8 */
+.src-row:last-child  { border-bottom-left-radius: 11px; border-bottom-right-radius: 11px; } /* was 8 */
+
+/* Settings + cards */
+.set-card { border-radius: 16px; }           /* was 12 */
+.set-row .form-input,
+.set-row .form-select { border-radius: 8px; } /* was 6 */
+
+/* player */
+.player-cover { border-radius: 8px; }        /* was 6  */
+
+/* Artist detail / Monthly / Persona editor */
+.detail-cover     { border-radius: 16px; }   /* was 12 (the artist-hero itself is full-bleed by design — left flat) */
+.monthly-top-card { border-radius: 18px; }   /* was 14 */
+.persona-card     { border-radius: 14px; }   /* was 10 */
+.persona-name-input { border-radius: 10px; } /* was 7  */
+.btn-save, .btn-cancel { border-radius: 10px; } /* was 7 */
+
+/* Menus & modals (account menu, persona switcher, context menu, dialogs) */
+.avatar-menu     { border-radius: 16px; }    /* was 12 */
+.am-item         { border-radius: 10px; }    /* was 7  */
+.am-spotify      { border-radius: 11px; }    /* was 8  */
+.persona-menu    { border-radius: 18px; }    /* was 13 */
+.persona-item, .persona-foot { border-radius: 12px; } /* was 9 */
+.persona-ctx-menu { border-radius: 12px; }   /* was 9  */
+.persona-ctx-item { border-radius: 8px; }    /* was 6  */
+.modal           { border-radius: 22px; }    /* was 16 */
+
+/* NOTE — a few inputs in the Sources & Settings *add forms*, plus the
+   Onboarding schedule/source rows, set border-radius inline in screens.jsx
+   (e.g. style={{ borderRadius: 7 }}); inline styles win over CSS, so bump those
+   numbers in the JSX if you want them rounder too. Everything class-based above
+   rounds automatically. */
+
+/* With .songs overflow visible (for the signal tooltip), the container no
    longer clips square row corners — round the first/last rows' hover background
-   to match the 14px frame. */
-.song:first-child { border-top-left-radius: 13px; border-top-right-radius: 13px; }
-.song:last-child  { border-bottom-left-radius: 13px; border-bottom-right-radius: 13px; }
+   to match the (now 18px) frame. */
+.song:first-child { border-top-left-radius: 17px; border-top-right-radius: 17px; }
+.song:last-child  { border-bottom-left-radius: 17px; border-bottom-right-radius: 17px; }

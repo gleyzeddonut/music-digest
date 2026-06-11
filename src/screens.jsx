@@ -519,13 +519,13 @@ export function SourcesScreen({ activePersonaId, personas = [], onPersonaSources
       </div>
 
       {/* Custom / Built-in tabs */}
-      <div style={{ display: 'flex', gap: 4, padding: 4, background: 'var(--bg-elev)', border: '1px solid var(--line)', borderRadius: 9, marginBottom: 18, width: 'fit-content' }}>
+      <div style={{ display: 'flex', gap: 4, padding: 4, background: 'var(--bg-elev)', border: '1px solid var(--line)', borderRadius: 12, marginBottom: 18, width: 'fit-content' }}>
         {[['custom', 'Custom'], ['builtin', 'Built-in']].map(([id, label]) => (
           <button
             key={id}
             onClick={() => setSrcTab(id)}
             style={{
-              padding: '7px 18px', borderRadius: 6, border: 'none', cursor: 'pointer',
+              padding: '7px 18px', borderRadius: 8, border: 'none', cursor: 'pointer',
               font: 'inherit', fontSize: 13, fontWeight: 600,
               background: srcTab === id ? 'var(--accent)' : 'transparent',
               color: srcTab === id ? '#fff' : 'var(--text-2)',
@@ -544,7 +544,7 @@ export function SourcesScreen({ activePersonaId, personas = [], onPersonaSources
           className="form-select"
           value={newType}
           onChange={e => { setNewType(e.target.value); setNewUrl(''); setNewSel(''); }}
-          style={{ background: 'var(--bg-elev)', border: '1px solid var(--line)', color: 'var(--text)', padding: '8px 12px', borderRadius: 7, font: 'inherit', fontSize: 13, outline: 'none' }}
+          style={{ background: 'var(--bg-elev)', border: '1px solid var(--line)', color: 'var(--text)', padding: '8px 12px', borderRadius: 10, font: 'inherit', fontSize: 13, outline: 'none' }}
         >
           {Object.entries(TYPE_LABELS).filter(([v]) => CUSTOM_TYPES.includes(v)).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
         </select>
@@ -553,7 +553,7 @@ export function SourcesScreen({ activePersonaId, personas = [], onPersonaSources
           placeholder="Display name"
           value={newName}
           onChange={e => setNewName(e.target.value)}
-          style={{ width: 160, background: 'var(--bg-elev)', border: '1px solid var(--line)', color: 'var(--text)', padding: '8px 12px', borderRadius: 7, font: 'inherit', fontSize: 13, outline: 'none' }}
+          style={{ width: 160, background: 'var(--bg-elev)', border: '1px solid var(--line)', color: 'var(--text)', padding: '8px 12px', borderRadius: 10, font: 'inherit', fontSize: 13, outline: 'none' }}
         />
         <input
           className="form-input"
@@ -561,7 +561,7 @@ export function SourcesScreen({ activePersonaId, personas = [], onPersonaSources
           value={newUrl}
           onChange={e => setNewUrl(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && addSource()}
-          style={{ width: 260, background: 'var(--bg-elev)', border: '1px solid var(--line)', color: 'var(--text)', padding: '8px 12px', borderRadius: 7, font: 'inherit', fontSize: 13, outline: 'none' }}
+          style={{ width: 260, background: 'var(--bg-elev)', border: '1px solid var(--line)', color: 'var(--text)', padding: '8px 12px', borderRadius: 10, font: 'inherit', fontSize: 13, outline: 'none' }}
         />
         {(newType === 'html') && (
           <input
@@ -569,7 +569,7 @@ export function SourcesScreen({ activePersonaId, personas = [], onPersonaSources
             placeholder="CSS selector (optional)"
             value={newSel}
             onChange={e => setNewSel(e.target.value)}
-            style={{ width: 200, background: 'var(--bg-elev)', border: '1px solid var(--line)', color: 'var(--text)', padding: '8px 12px', borderRadius: 7, font: 'inherit', fontSize: 13, outline: 'none' }}
+            style={{ width: 200, background: 'var(--bg-elev)', border: '1px solid var(--line)', color: 'var(--text)', padding: '8px 12px', borderRadius: 10, font: 'inherit', fontSize: 13, outline: 'none' }}
           />
         )}
         <button className="btn-primary" onClick={addSource}>Add</button>
@@ -602,7 +602,7 @@ export function SourcesScreen({ activePersonaId, personas = [], onPersonaSources
                 <div className={`src-type-tag ${typeTagClass[s.type] || 't-html'}`}>{TYPE_LABELS[s.type]}</div>
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                   <button
-                    style={{ fontSize: 11, padding: '4px 9px', background: 'var(--bg-elev)', border: '1px solid var(--line)', borderRadius: 5, color: 'var(--text-2)', cursor: 'pointer' }}
+                    style={{ fontSize: 11, padding: '4px 9px', background: 'var(--bg-elev)', border: '1px solid var(--line)', borderRadius: 7, color: 'var(--text-2)', cursor: 'pointer' }}
                     onClick={() => test(s.id)}
                   >
                     {testing[s.id] === 'loading' ? '…' : testing[s.id] || 'Test'}
@@ -792,7 +792,7 @@ export function SettingsScreen({ onSpotifyConnect, refreshTrigger = 0, activePer
     </div>
   );
 
-  const inputStyle = { background: 'var(--bg-elev)', border: '1px solid var(--line)', color: 'var(--text)', padding: '7px 11px', borderRadius: 6, fontFamily: 'var(--f-mono)', fontSize: 12.5, outline: 'none' };
+  const inputStyle = { background: 'var(--bg-elev)', border: '1px solid var(--line)', color: 'var(--text)', padding: '7px 11px', borderRadius: 8, fontFamily: 'var(--f-mono)', fontSize: 12.5, outline: 'none' };
   const gridRow = { display: 'grid', gridTemplateColumns: '240px 1fr', gap: 56, marginBottom: 48, alignItems: 'start' };
 
   return (
@@ -1287,7 +1287,7 @@ export function Onboarding({ onDone }) {
     <div className="ob-wrap">
       <div className="ob-left">
         <div className="ob-brand" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ width: 26, height: 26, background: 'var(--accent)', borderRadius: 7, display: 'grid', placeItems: 'center' }}>
+          <div style={{ width: 26, height: 26, background: 'var(--accent)', borderRadius: 10, display: 'grid', placeItems: 'center' }}>
             <Icon name="today" size={13} />
           </div>
           <span style={{ fontFamily: 'var(--f-sans)', fontWeight: 700, fontSize: 15 }}>Music <em style={{ fontFamily: 'var(--f-serif)', fontStyle: 'italic', color: 'var(--accent)', fontSize: 17 }}>Digest</em></span>
@@ -1403,7 +1403,7 @@ function StepSources() {
       <p className="ob-desc">These are the sources seeded by default. Toggle them on/off or add your own later.</p>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {sources.slice(0, 5).map(s => (
-          <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: 'var(--bg-elev)', borderRadius: 8, border: '1px solid var(--line-soft)' }}>
+          <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: 'var(--bg-elev)', borderRadius: 11, border: '1px solid var(--line-soft)' }}>
             <button
               className={`toggle${s.enabled ? ' on' : ''}`}
               onClick={() => api.patchSource(s.id, { enabled: !s.enabled }).then(() => setSources(prev => prev.map(p => p.id === s.id ? { ...p, enabled: !p.enabled } : p)))}
@@ -1436,12 +1436,12 @@ function StepSchedule({ onDone }) {
         <div>
           <div style={{ fontFamily: 'var(--f-mono)', fontSize: 10.5, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 6 }}>Send time</div>
           <input type="time" value={time} onChange={e => setTime(e.target.value)}
-            style={{ background: 'var(--bg-elev)', border: '1px solid var(--line)', color: 'var(--text)', padding: '10px 14px', borderRadius: 8, fontFamily: 'var(--f-mono)', fontSize: 14, outline: 'none' }} />
+            style={{ background: 'var(--bg-elev)', border: '1px solid var(--line)', color: 'var(--text)', padding: '10px 14px', borderRadius: 11, fontFamily: 'var(--f-mono)', fontSize: 14, outline: 'none' }} />
         </div>
         <div>
           <div style={{ fontFamily: 'var(--f-mono)', fontSize: 10.5, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 6 }}>Email address</div>
           <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com"
-            style={{ background: 'var(--bg-elev)', border: '1px solid var(--line)', color: 'var(--text)', padding: '10px 14px', borderRadius: 8, fontFamily: 'var(--f-mono)', fontSize: 14, outline: 'none', width: '100%' }} />
+            style={{ background: 'var(--bg-elev)', border: '1px solid var(--line)', color: 'var(--text)', padding: '10px 14px', borderRadius: 11, fontFamily: 'var(--f-mono)', fontSize: 14, outline: 'none', width: '100%' }} />
         </div>
       </div>
       <div className="ob-foot" style={{ paddingTop: 0, marginTop: 0 }}>
@@ -1522,7 +1522,7 @@ export function MonthlyScreen({ data }) {
               <div className="monthly-top-card">
                 <div className="section-eyebrow" style={{ marginBottom: 14 }}>Artist of the Month</div>
                 <div className="monthly-top-artist-row">
-                  <div style={{ width: 52, height: 52, borderRadius: 10, overflow: 'hidden', flexShrink: 0 }}>
+                  <div style={{ width: 52, height: 52, borderRadius: 14, overflow: 'hidden', flexShrink: 0 }}>
                     <CoverArt initials={(topArtist.name || '').slice(0, 2)} bg={bgFromName(topArtist.name)} />
                   </div>
                   <div>
@@ -1791,7 +1791,7 @@ export function LoadingShell() {
       {[1,2,3].map(i => (
         <div key={i} style={{
           height: i === 1 ? 200 : 60,
-          borderRadius: 12,
+          borderRadius: 16,
           background: 'var(--bg-card)',
           border: '1px solid var(--line-soft)',
           animation: 'pulse 1.4s ease infinite',
