@@ -17,9 +17,10 @@ cut, the Unreleased entries move under that version's heading with the date.
   Library) are now **foldable** — click the group header to collapse/expand
   (chevron appears on hover); collapsed state is remembered across sessions.
 - **Slimmer Spotify status**: the bottom-left "Connected / Spotify" pill now only
-  appears while disconnected and slides away on connect; once connected, a small
-  green light next to the Playlist label signals the connection (hover it for
-  "Spotify is connected").
+  appears while disconnected and slides away on connect; once connected, the
+  bottom of the sidebar is a single compact line — a small green light (hover:
+  "Spotify is connected") beside the playlist-name field. The shared/custom
+  persona-playlist badge moved into the field's tooltip.
 
 ## [1.7.8] — 2026-06-10
 

@@ -375,16 +375,8 @@ function Sidebar({ route, onNavigate, spotifyConnected, personas = [], activePer
           const isPersonaMode = !!(activePersona && !activePersona.is_default);
           return (
             <div className="playlist-name-row">
-              <div className="playlist-name-label">
-                <span>Playlist</span>
-                <span className="spotify-status-dot" title="Spotify is connected" />
-                {isPersonaMode && (
-                  <span className={`playlist-name-badge${playlistNameIsPersona ? ' custom' : ''}`}>
-                    {playlistNameIsPersona ? 'custom' : 'shared'}
-                  </span>
-                )}
-              </div>
-              <div className="playlist-name-field">
+              <span className="spotify-status-dot" title="Spotify is connected" />
+              <div className="playlist-name-field" title={isPersonaMode ? `Playlist (${playlistNameIsPersona ? 'custom' : 'shared'})` : 'Playlist'}>
                 <input
                   className={`playlist-name-input${playlistNameIsPersona ? ' is-persona' : ''}`}
                   value={localPlaylistName}
