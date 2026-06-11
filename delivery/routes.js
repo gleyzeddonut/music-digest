@@ -213,6 +213,18 @@ router.post('/api/settings/login-item', (req, res) => {
   res.json({ ok: true });
 });
 
+// App self-update — the sidebar "Update to vX" pill posts here. The updater
+// (electron/updater.js) registers global.__appUpdater only in the packaged
+// Electron app; everywhere else (dev, plain node) this 404s and the pill
+// falls back to opening the releases page. Responds immediately: the download
+// runs in the background and the app restarts itself when it finishes.
+router.post('/api/update/install', (req, res) => {
+  const updater = global.__appUpdater;
+  if (!updater) return res.status(404).json({ error: 'Updater not available' });
+  updater.installUpdate().catch(err => console.warn('[routes] update install failed:', err?.message));
+  res.json({ ok: true, status: 'installing' });
+});
+
 // Update user-configurable config values.
 // Unlike persistSetupConfig (which sets all fields unconditionally), this is a
 // patch-style route: only fields present in the request body are updated.

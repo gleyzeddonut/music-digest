@@ -95,6 +95,59 @@ function BrandMark() {
   );
 }
 
+// ─── Update pill ──────────────────────────────────────────────
+// Clicking installs the update in-place: POST /api/update/install → the main
+// process downloads the release and restarts the app itself. Nothing happens
+// without this click (no auto-install). Outside the packaged app — or if the
+// updater fails — it falls back to opening the releases page in the browser.
+function UpdatePill({ updateInfo }) {
+  const [updating, setUpdating] = React.useState(false);
+
+  const install = async () => {
+    if (updating) return;
+    setUpdating(true);
+    try {
+      await api.installUpdate();
+      // Download runs in the background; the app restarts itself when done.
+      // If it silently fails, re-enable the pill so the user can retry.
+      setTimeout(() => setUpdating(false), 180_000);
+    } catch {
+      setUpdating(false);
+      window.open(updateInfo.url, '_blank');
+    }
+  };
+
+  return (
+    <div
+      className="update-pill"
+      role="button"
+      title={updating ? 'Downloading update…' : `Update to Music Digest v${updateInfo.version} and restart`}
+      onClick={install}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 8,
+        margin: '0 0 12px', padding: '10px 12px',
+        background: 'var(--accent)', color: '#fff',
+        borderRadius: 9, fontSize: 12.5, fontWeight: 600,
+        textDecoration: 'none', cursor: updating ? 'progress' : 'pointer',
+        opacity: updating ? 0.75 : 1,
+        boxShadow: '0 3px 14px rgba(0,0,0,0.28)',
+      }}
+    >
+      <span className="update-pill-dot" style={{
+        width: 7, height: 7, borderRadius: '50%', background: '#fff',
+        boxShadow: '0 0 0 0 rgba(255,255,255,0.7)', flex: '0 0 auto',
+        animation: 'updatePulse 1.8s ease-out infinite',
+      }} />
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{ flex: '0 0 auto' }}>
+        <line x1="12" y1="19" x2="12" y2="5" /><polyline points="5 12 12 5 19 12" />
+      </svg>
+      <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        {updating ? 'Updating…' : `Update to v${updateInfo.version}`}
+      </span>
+    </div>
+  );
+}
+
 // ─── Sidebar ──────────────────────────────────────────────────
 
 function NavItem({ id, label, icon, route, onNavigate }) {
@@ -337,33 +390,7 @@ function Sidebar({ route, onNavigate, spotifyConnected, personas = [], activePer
       </div>
 
       <div className="sidebar-bottom">
-        {updateInfo && (
-          <a
-            className="update-pill"
-            href={updateInfo.url}
-            target="_blank"
-            rel="noreferrer"
-            title={`Download Music Digest v${updateInfo.version}`}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 8,
-              margin: '0 0 12px', padding: '10px 12px',
-              background: 'var(--accent)', color: '#fff',
-              borderRadius: 9, fontSize: 12.5, fontWeight: 600,
-              textDecoration: 'none', cursor: 'pointer',
-              boxShadow: '0 3px 14px rgba(0,0,0,0.28)',
-            }}
-          >
-            <span className="update-pill-dot" style={{
-              width: 7, height: 7, borderRadius: '50%', background: '#fff',
-              boxShadow: '0 0 0 0 rgba(255,255,255,0.7)', flex: '0 0 auto',
-              animation: 'updatePulse 1.8s ease-out infinite',
-            }} />
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{ flex: '0 0 auto' }}>
-              <line x1="12" y1="19" x2="12" y2="5" /><polyline points="5 12 12 5 19 12" />
-            </svg>
-            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Update to v{updateInfo.version}</span>
-          </a>
-        )}
+        {updateInfo && <UpdatePill updateInfo={updateInfo} />}
         {/* Only visible while disconnected; slides away on connect (the green
             dot next to "Playlist" takes over as the connected signal). */}
         <div className={`spotify-pill-wrap${spotifyConnected ? ' away' : ''}`}>

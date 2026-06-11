@@ -9,6 +9,16 @@ cut, the Unreleased entries move under that version's heading with the date.
 
 ## [Unreleased]
 
+### Changed
+- **Updates are now user-initiated, not automatic.** The app no longer
+  downloads updates or shows a restart dialog on its own — it only checks
+  availability. Clicking the sidebar "Update to vX" pill is what installs:
+  it downloads in place (pill shows "Updating…") and the app restarts itself.
+  New `POST /api/update/install` route bridges the pill to the updater via
+  `global.__appUpdater`; outside the packaged app (or on failure) the pill
+  falls back to opening the releases page. A finished download still installs
+  on quit (`autoInstallOnAppQuit`) if the user quits instead of restarting.
+
 ## [1.7.9] — 2026-06-11
 
 ### Fixed
