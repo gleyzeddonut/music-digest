@@ -91,6 +91,36 @@ function titleMentionsArtist(text, key) {
   return false;
 }
 
+// Normalized tokens that look like proper nouns in the ORIGINAL text — i.e.
+// not written as a plain all-lowercase word. "Future" and "MGK" qualify;
+// "future" mid-sentence does not. Used to stop single-token artists whose name
+// is a common English word (Future, Muse, War…) from matching every headline
+// that merely contains that word.
+function properNounTokens(text) {
+  const out = new Set();
+  for (const raw of String(text || '').split(/\s+/)) {
+    const core = raw.replace(/^[^\w$]+|[^\w$]+$/g, '');
+    if (!core || /^[a-z0-9_]+$/.test(core)) continue; // plain lowercase word → skip
+    const norm = core.toLowerCase().replace(/\$/g, 's').replace(/[^\w]/g, '');
+    if (norm) out.add(norm);
+  }
+  return out;
+}
+
+// Single-token keys need the proper-noun check in publication headlines —
+// unless the artist's canonical name is itself lowercase-stylized ("glaive"),
+// where a lowercase appearance is the expected form. Multi-token keys are
+// already unambiguous enough. Reddit titles are exempt: casual all-lowercase
+// writing is normal there and the guard would cost more real signal than the
+// noise it removes.
+function passesProperNounGuard(key, entity, properToks) {
+  if (key.includes(' ')) return true;
+  const canonical = (entity.name || '').trim();
+  const firstAlpha = canonical.match(/[a-zA-Z]/);
+  if (firstAlpha && firstAlpha[0] === firstAlpha[0].toLowerCase()) return true;
+  return properToks.has(key);
+}
+
 // ── Extract artist name from editorial headline ───────────────────────────────
 const MUSIC_VERBS = /\b(releases?|drops?|announces?|shares?|debuts?|performs?|covers?|remixes?|reveals?|signs?|joins?|leaves?|cancels?|postpones?|collaborates?|features?|previews?|interviews?|reviews?|tours?|albums?|singles?|videos?|eps?|mixtapes?)\b/i;
 
@@ -196,6 +226,7 @@ function buildMentionMap(redditData, webData, appleCharts, lastfmArtists, genius
   for (const { source, items } of webData) {
     for (const item of items) {
       const titleToks = matchTokens(item.title || '');
+      const properToks = properNounTokens(item.title || '');
 
       // Try headline-pattern extraction first (discovers non-chart artists)
       const extracted = extractArtistFromTitle(item.title || '');
@@ -213,6 +244,7 @@ function buildMentionMap(redditData, webData, appleCharts, lastfmArtists, genius
       // Also scan all known chart artists in the title (whole-token match)
       for (const [key, entity] of map.entries()) {
         if (key.length >= 3 && titleMentionsArtist(titleToks, key) &&
+            passesProperNounGuard(key, entity, properToks) &&
             !entity.editorialArticles.some(a => a.title === item.title)) {
           entity.editorialArticles.push({ source, title: item.title, published: item.published });
         }
@@ -237,45 +269,61 @@ function buildMentionMap(redditData, webData, appleCharts, lastfmArtists, genius
 
 // ── Sub-score functions ──────────────────────────────────────────────────────
 
+// Rank → 0..1 within the top `window` positions, 0 beyond. Scrapers return
+// however many rows the source page lists (kworb Shazam = 200, TikTok = 100),
+// so without the clamp a deep rank goes NEGATIVE and erases real signal from
+// other charts.
+function rankScore(rank, window) {
+  return Math.max(0, 1 - (rank - 1) / (window - 1));
+}
+
 function calcChartScore(entity) {
+  const pos = entity.chartPositions;
   let score = 0;
   // Shazam Viral: highest weight — measures growth rate, not volume
-  if (entity.chartPositions.shazam != null) {
-    score += 0.40 * (1 - (entity.chartPositions.shazam - 1) / 49);
-  }
+  if (pos.shazam       != null) score += 0.40 * rankScore(pos.shazam, 50);
   // TikTok US: strong virality/discovery signal
-  if (entity.chartPositions.tiktok != null) {
-    score += 0.20 * (1 - (entity.chartPositions.tiktok - 1) / 49);
-  }
-  if (entity.chartPositions.apple != null) {
-    score += 0.20 * (1 - (entity.chartPositions.apple - 1) / 99);
-  }
-  // Removed additive constants — any rank now scores proportionally (0 at bottom)
-  if (entity.chartPositions.lastfm != null) {
-    score += 0.20 * (1 - (entity.chartPositions.lastfm - 1) / 49);
-  }
-  if (entity.chartPositions.lastfm_track != null) {
-    score += 0.15 * (1 - (entity.chartPositions.lastfm_track - 1) / 49);
-  }
-  if (entity.chartPositions.spotify != null) {
-    score += 0.10 * (1 - (entity.chartPositions.spotify - 1) / 199);
-  }
+  if (pos.tiktok       != null) score += 0.20 * rankScore(pos.tiktok, 50);
+  if (pos.apple        != null) score += 0.20 * rankScore(pos.apple, 100);
+  if (pos.lastfm       != null) score += 0.20 * rankScore(pos.lastfm, 50);
+  if (pos.lastfm_track != null) score += 0.15 * rankScore(pos.lastfm_track, 50);
+  if (pos.spotify      != null) score += 0.10 * rankScore(pos.spotify, 200);
   // YouTube Trending Music — mainstream video consumption signal
-  if (entity.chartPositions.youtube != null) {
-    score += 0.12 * Math.max(0, 1 - (entity.chartPositions.youtube - 1) / 49);
-  }
+  if (pos.youtube      != null) score += 0.12 * rankScore(pos.youtube, 50);
   return Math.min(1, score);
 }
 
-function calcEditorialScore(entity) {
-  const seen = new Set();
-  let score = 0;
+// Articles decay with age so week-old RSS backlog doesn't read as today's buzz.
+// Unknown publish date gets a middling factor rather than full credit.
+function editorialAgeFactor(published, now = Date.now()) {
+  if (!published) return 0.7;
+  const ageDays = (now - new Date(published).getTime()) / 86_400_000;
+  if (Number.isNaN(ageDays)) return 0.7;
+  if (ageDays <= 1) return 1.0;
+  if (ageDays <= 2) return 0.85;
+  if (ageDays <= 4) return 0.6;
+  if (ageDays <= 7) return 0.35;
+  return 0.15;
+}
+
+// Sources outside the prestige tiers (user-added RSS feeds) count at tier-3
+// weight instead of zero — otherwise custom sources contribute no editorial
+// signal at all.
+const DEFAULT_SOURCE_WEIGHT = EDITORIAL_WEIGHTS[3];
+
+function calcEditorialScore(entity, now = Date.now()) {
+  // Best (weight × recency) article per source; one credit per source so a
+  // single feed spamming an artist can't stack.
+  const bestPerSource = new Map();
   for (const article of entity.editorialArticles) {
-    if (!seen.has(article.source) && SOURCE_WEIGHT[article.source] != null) {
-      score += SOURCE_WEIGHT[article.source];
-      seen.add(article.source);
+    const weight = SOURCE_WEIGHT[article.source] ?? DEFAULT_SOURCE_WEIGHT;
+    const value = weight * editorialAgeFactor(article.published, now);
+    if (value > (bestPerSource.get(article.source) || 0)) {
+      bestPerSource.set(article.source, value);
     }
   }
+  let score = 0;
+  for (const value of bestPerSource.values()) score += value;
   return Math.min(1, score);
 }
 
@@ -320,12 +368,19 @@ function calcVelocityScore(entity) {
   }
   if (bestRecency > 0) signals.push(bestRecency);
 
-  return signals.length > 0
-    ? signals.reduce((a, b) => a + b, 0) / signals.length
-    : 0;
+  // Strongest signal + a small bonus per corroborating signal. A plain average
+  // punished breadth: one 1.0 signal beat 1.0 + 0.5, which is backwards.
+  if (signals.length === 0) return 0;
+  const best = Math.max(...signals);
+  const corroboration = Math.min(0.2, (signals.length - 1) * 0.1);
+  return Math.min(1, best + corroboration);
 }
 
 // ── Persist Last.fm baselines ────────────────────────────────────────────────
+// A baseline is only refreshed once it's ≥7 days old, so "current vs baseline"
+// is a real week-over-week delta. The old behavior overwrote baselines on every
+// run, which made the comparison day-over-day at best — and ~zero when several
+// personas ran the same day — killing the velocity signal entirely.
 function updateBaselines(lastfmArtists) {
   if (!lastfmArtists.length) return;
   const db = getDb();
@@ -335,14 +390,17 @@ function updateBaselines(lastfmArtists) {
     ON CONFLICT(artist_name) DO UPDATE
       SET listeners  = excluded.listeners,
           updated_at = excluded.updated_at
+      WHERE artist_baselines.updated_at <= datetime('now', '-7 days')
   `);
+  let refreshed = 0;
   const run = db.transaction(() => {
     for (const { name, listeners } of lastfmArtists) {
-      upsert.run(normalizeArtist(name), listeners);
+      const info = upsert.run(normalizeArtist(name), listeners);
+      refreshed += info.changes;
     }
   });
   run();
-  console.log(`[scorer] Updated ${lastfmArtists.length} Last.fm baselines`);
+  console.log(`[scorer] Baselines: ${refreshed}/${lastfmArtists.length} refreshed (≥7 days old or new)`);
 }
 
 // ── Main entry point ─────────────────────────────────────────────────────────
@@ -388,4 +446,9 @@ function score(redditData, webData, appleCharts, lastfmArtists, geniusTrending, 
   return { breaking, rising };
 }
 
-module.exports = { score, normalizeArtist, normalizeTrack, matchTokens, titleMentionsArtist };
+module.exports = {
+  score, normalizeArtist, normalizeTrack, matchTokens, titleMentionsArtist,
+  // exported for tests
+  rankScore, calcChartScore, calcEditorialScore, calcVelocityScore,
+  editorialAgeFactor, properNounTokens, passesProperNounGuard,
+};

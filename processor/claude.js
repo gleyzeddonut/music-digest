@@ -126,39 +126,83 @@ Writing style for the summary:
 - Each bullet on its own line, separated by \\n — never run them together in one block
 - One artist or story per bullet — if two artists are mentioned, use two bullets
 
-Respond with valid JSON only, no markdown, no explanation:
-{
-  "summary": "5-8 bullets, one per line separated by \\n. Each starts with '• '. One story per bullet. Example: '• Kendrick Lamar topped Apple Charts this week.\\n• Megan Thee Stallion released a surprise EP on Friday.'",
-  "artists": [
-    {"name": "string", "tier": "breaking|rising", "reason": "1-2 sentences: what specifically is driving attention, cite sources/numbers"}
-  ],
-  "songs": [
-    {"title": "string", "artist": "string", "tier": "breaking|rising", "reason": "why this track is getting attention", "sources": ["source name 1", "source name 2"]}
-  ],
-  "headline_indices": [0, 4, 7],
-  "mentioned_artists": ["every musician or band name you mention anywhere in the summary — musicians and bands only, never actors, journalists, hosts, or other non-music figures"]
-}`;
+Submit your analysis via the submit_digest tool.`;
+
+  // Forced tool-use guarantees schema-shaped JSON — no code fences, no leading
+  // prose, no "Claude returned no JSON object" failures after a full scrape.
+  const digestTool = {
+    name: 'submit_digest',
+    description: 'Submit the completed daily music digest.',
+    input_schema: {
+      type: 'object',
+      required: ['summary', 'artists', 'songs', 'headline_indices', 'mentioned_artists'],
+      properties: {
+        summary: {
+          type: 'string',
+          description: "5-8 bullets, one per line separated by \\n. Each starts with '• '. One story per bullet. Example: '• Kendrick Lamar topped Apple Charts this week.\\n• Megan Thee Stallion released a surprise EP on Friday.'",
+        },
+        artists: {
+          type: 'array',
+          items: {
+            type: 'object',
+            required: ['name', 'tier', 'reason'],
+            properties: {
+              name:   { type: 'string' },
+              tier:   { type: 'string', enum: ['breaking', 'rising'] },
+              reason: { type: 'string', description: '1-2 sentences: what specifically is driving attention, cite sources/numbers' },
+            },
+          },
+        },
+        songs: {
+          type: 'array',
+          items: {
+            type: 'object',
+            required: ['title', 'artist', 'tier', 'reason'],
+            properties: {
+              title:   { type: 'string' },
+              artist:  { type: 'string' },
+              tier:    { type: 'string', enum: ['breaking', 'rising'] },
+              reason:  { type: 'string', description: 'why this track is getting attention' },
+              sources: { type: 'array', items: { type: 'string' }, description: 'exact source names that mentioned it' },
+            },
+          },
+        },
+        headline_indices: {
+          type: 'array',
+          items: { type: 'integer' },
+          description: 'index numbers of the 6-10 most newsworthy articles from the music news section',
+        },
+        mentioned_artists: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'every musician or band name mentioned anywhere in the summary — musicians and bands only, never actors, journalists, hosts, or other non-music figures',
+        },
+      },
+    },
+  };
+
+  const requestBody = {
+    model: 'claude-sonnet-4-6',
+    max_tokens: 8000,
+    // Low temperature: this is a factual brief — reduces run-to-run variance
+    // in what gets surfaced from the same data.
+    temperature: 0.3,
+    system: systemPrompt,
+    tools: [digestTool],
+    tool_choice: { type: 'tool', name: 'submit_digest' },
+    messages: [{ role: 'user', content: rawContent }],
+  };
 
   let response;
   if (ownKey) {
     const Anthropic = require('@anthropic-ai/sdk');
     const client = new Anthropic({ apiKey: ownKey, timeout: 120_000 });
-    response = await client.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 8000,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: rawContent }],
-    });
+    response = await client.messages.create(requestBody);
   } else {
     const res = await fetch(`${supabase.url}/functions/v1/claude-proxy`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...(await auth.authHeaders()) },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 8000,
-        system: systemPrompt,
-        messages: [{ role: 'user', content: rawContent }],
-      }),
+      body: JSON.stringify(requestBody),
       signal: AbortSignal.timeout(120_000),
     });
     if (!res.ok) throw new Error(`Claude proxy error ${res.status}: ${await res.text()}`);
@@ -168,17 +212,26 @@ Respond with valid JSON only, no markdown, no explanation:
   if (response.stop_reason === 'max_tokens') {
     console.error('[claude] Response was truncated — output hit token limit');
   }
+  console.log('[claude] stop_reason:', response.stop_reason);
 
-  const text = response.content[0].text.trim();
-  console.log('[claude] Response length:', text.length, 'chars, stop_reason:', response.stop_reason);
+  const result = extractResult(response);
+  if (result.summary) result.summary = normalizeSummaryBullets(result.summary);
+  return result;
+}
 
-  // Extract JSON — handle code fences, leading/trailing text
+// Forced tool use puts the digest in a tool_use block; fall back to text-JSON
+// extraction in case the API ever returns prose instead (e.g. refusal edge).
+function extractResult(response) {
+  const toolBlock = (response.content || []).find(b => b.type === 'tool_use');
+  if (toolBlock?.input && typeof toolBlock.input === 'object') return toolBlock.input;
+
+  const textBlock = (response.content || []).find(b => b.type === 'text');
+  const text = (textBlock?.text || '').trim();
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   if (!jsonMatch) {
-    console.error('[claude] No JSON object found in response:', text.slice(0, 300));
+    console.error('[claude] No tool_use block or JSON object in response:', text.slice(0, 300));
     throw new Error('Claude returned no JSON object');
   }
-
   try {
     return JSON.parse(jsonMatch[0]);
   } catch {
@@ -187,4 +240,19 @@ Respond with valid JSON only, no markdown, no explanation:
   }
 }
 
-module.exports = { processWithClaude };
+// Every consumer (UI brief, email) keeps only lines that start with "• " — if
+// the model bullets with "-" or "*" the brief silently renders empty. Normalize
+// once here so format drift can't blank the brief.
+function normalizeSummaryBullets(summary) {
+  return String(summary)
+    .split('\n')
+    .map(l => l.trim())
+    .filter(Boolean)
+    .map(l => {
+      const stripped = l.replace(/^[-*–—‣◦·]\s+/, '');
+      return stripped.startsWith('•') ? stripped : `• ${stripped}`;
+    })
+    .join('\n');
+}
+
+module.exports = { processWithClaude, normalizeSummaryBullets };

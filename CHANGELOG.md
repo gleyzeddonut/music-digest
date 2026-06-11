@@ -9,7 +9,35 @@ cut, the Unreleased entries move under that version's heading with the date.
 
 ## [Unreleased]
 
+### Fixed
+- **Scoring: deep chart ranks no longer go negative.** kworb's Shazam page lists
+  200 rows (TikTok 100) but the formulas assumed top-50, so e.g. Shazam #150
+  contributed −0.81 and could erase an artist's genuine Apple/Spotify signal.
+  All rank formulas (artist + song scoring) now clamp at 0 outside their window.
+- **Velocity signal revived.** Last.fm baselines were overwritten on every run,
+  making "current vs baseline" a day-over-day (or same-day, with multiple
+  personas) comparison that always read ~0%. Baselines now only refresh when
+  ≥7 days old, so the delta is a true week-over-week measure.
+- **Score badges no longer silently lost.** The scorer→Claude artist merge
+  matched on raw lowercase names; stylistic differences ("ROSÉ & Bruno Mars" vs
+  "ROSÉ") dropped the sub-score badges. The merge now keys on normalized names,
+  and the scorer's pre-computed tier is enforced rather than trusted to the
+  prompt.
+
 ### Changed
+- **Brief generation hardened**: Claude now responds via forced tool-use with a
+  JSON schema (no more "returned no JSON" failures after a full scrape), runs at
+  temperature 0.3 for steadier output, and summary bullets are normalized
+  server-side ("-"/"*" → "•") so format drift can't blank the brief in the UI
+  or email.
+- **Scoring refinements**: editorial articles decay with age (week-old RSS
+  backlog no longer reads as today's news); user-added sources count at tier-3
+  weight instead of zero; velocity uses strongest-signal + corroboration bonus
+  instead of an average that punished breadth; common-word artist names
+  ("Future", "Muse") only match editorial headlines when written as proper
+  nouns (lowercase-stylized artists like "glaive" exempt); song chart matching
+  by title alone now requires the artists to agree, so a song can't inherit
+  ranks from a same-titled track by someone else.
 - **Sidebar reorganized**: "Daily" now holds Today, The Brief, Artists, and
   Songs (Artists/Songs jump to their section of the Today page); a new
   "Archive" group holds This Month and History; Sources sits standalone above

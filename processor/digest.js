@@ -10,7 +10,7 @@ const { scrapeKworbShazam, scrapeKworbSpotify } = require('../scraper/kworb');
 const { scrapeHypem } = require('../scraper/hypem');
 const { scrapeTokchart } = require('../scraper/tokchart');
 const { scrapeYoutubeSources } = require('../scraper/youtube');
-const { score, normalizeArtist, normalizeTrack } = require('./scorer');
+const { score, normalizeArtist, normalizeTrack, rankScore } = require('./scorer');
 const { processWithClaude } = require('./claude');
 const { appendSongsToPlaylist } = require('./spotify');
 const { sendDigestEmail } = require('../delivery/email');
@@ -153,15 +153,20 @@ async function runDigest(opts = {}) {
   result.songs = scoreSongs(result.songs || [], lastfmData.tracks, geniusTrending, shazamChart, spotifyChart, appleCharts, tokchartData, youtubeData);
   console.log(`[digest] Song scores: ${result.songs.map(s => `${s.title}(${s.song_score.toFixed(2)})`).join(', ')}`);
 
-  // Merge scorer sub-scores into Claude's artist output for UI badge rendering
+  // Merge scorer sub-scores into Claude's artist output for UI badge rendering.
+  // Keyed by normalizeArtist (not raw toLowerCase) so stylistic differences in
+  // how Claude writes the name ("ROSÉ & Bruno Mars" vs "ROSÉ") still match.
+  // The scorer's tier is authoritative — the prompt asks Claude to preserve
+  // tiers, but this enforces it; Claude's own tier survives only for artists
+  // the scorer didn't rank.
   const scorerIndex = {};
-  for (const s of [...scoredData.breaking, ...scoredData.rising]) {
-    scorerIndex[s.entity.name.toLowerCase()] = s;
-  }
+  for (const s of scoredData.rising)   scorerIndex[normalizeArtist(s.entity.name)] = { ...s, tier: 'rising' };
+  for (const s of scoredData.breaking) scorerIndex[normalizeArtist(s.entity.name)] = { ...s, tier: 'breaking' };
   result.artists = (result.artists || []).map(a => {
-    const s = scorerIndex[a.name?.toLowerCase()];
+    const s = scorerIndex[normalizeArtist(a.name)];
     if (!s) return a;
-    return { ...a, chart_score: s.chart, editorial_score: s.editorial, community_score: s.community, velocity_score: s.velocity };
+    if (a.tier !== s.tier) console.warn(`[digest] Tier corrected for ${a.name}: ${a.tier} → ${s.tier}`);
+    return { ...a, tier: s.tier, chart_score: s.chart, editorial_score: s.editorial, community_score: s.community, velocity_score: s.velocity };
   });
 
   // 5. Spotify playlist
@@ -225,15 +230,36 @@ async function runDigest(opts = {}) {
   };
 }
 
-function buildChartMap(tracks) {
+function buildChartMap(tracks, valueKey = 'rank') {
   const map = new Map();
   for (const t of tracks) {
     const full  = normalizeTrack(t.title) + '|' + normalizeArtist(t.artist);
     const title = normalizeTrack(t.title);
-    if (!map.has(full))  map.set(full,  t.rank);
-    if (!map.has(title)) map.set(title, t.rank);
+    const entry = { value: t[valueKey], artist: normalizeArtist(t.artist) };
+    if (!map.has(full))  map.set(full,  entry);
+    if (!map.has(title)) map.set(title, entry);
   }
   return map;
+}
+
+// Two normalized artist strings "agree" when they share a meaningful token —
+// tolerates "feat." variants and collab orderings without exact equality.
+function artistsOverlap(a, b) {
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const bTokens = new Set(b.split(' '));
+  return a.split(' ').some(tok => tok.length > 1 && bTokens.has(tok));
+}
+
+// Full title|artist key first; title-only fallback ONLY when the chart entry's
+// artist overlaps. The old unconditional fallback let a song called "Forever"
+// inherit chart ranks from any "Forever" by anyone.
+function lookupChart(map, fullKey, titleNorm, artistNorm) {
+  const exact = map.get(fullKey);
+  if (exact) return exact.value;
+  const byTitle = map.get(titleNorm);
+  if (byTitle && artistsOverlap(byTitle.artist, artistNorm)) return byTitle.value;
+  return null;
 }
 
 function scoreSongs(songs, lastfmTracks = [], geniusTrending = [], shazamChart = [], spotifyChart = [], appleCharts = [], tokchartData = [], youtubeData = []) {
@@ -243,36 +269,33 @@ function scoreSongs(songs, lastfmTracks = [], geniusTrending = [], shazamChart =
   const spotifyMap  = buildChartMap(spotifyChart);
   const appleMap    = buildChartMap(appleCharts);
   const youtubeMap  = buildChartMap(youtubeData);
-  // Tokchart: normalise score (1–1000) to a rank-like index for map building
-  const tokMap = new Map();
-  for (const t of tokchartData) {
-    const key = normalizeTrack(t.title) + '|' + normalizeArtist(t.artist);
-    tokMap.set(key, t.score);
-    tokMap.set(normalizeTrack(t.title), t.score);
-  }
+  // Tokchart carries a score (1–1000) instead of a rank
+  const tokMap      = buildChartMap(tokchartData, 'score');
 
   return songs.map(s => {
     const titleNorm  = normalizeTrack(s.title);
     const artistNorm = normalizeArtist(s.artist);
     const fullKey    = titleNorm + '|' + artistNorm;
 
-    const lfmRank     = lfmMap.get(fullKey)     ?? lfmMap.get(titleNorm)     ?? null;
-    const geniusRank  = geniusMap.get(fullKey)  ?? geniusMap.get(titleNorm)  ?? null;
-    const shazamRank  = shazamMap.get(fullKey)  ?? shazamMap.get(titleNorm)  ?? null;
-    const spotifyRank = spotifyMap.get(fullKey) ?? spotifyMap.get(titleNorm) ?? null;
-    const appleRank   = appleMap.get(fullKey)   ?? appleMap.get(titleNorm)   ?? null;
-    const youtubeRank = youtubeMap.get(fullKey) ?? youtubeMap.get(titleNorm) ?? null;
-    const tokScore    = tokMap.get(fullKey)     ?? tokMap.get(titleNorm)     ?? null;
+    const lfmRank     = lookupChart(lfmMap,     fullKey, titleNorm, artistNorm);
+    const geniusRank  = lookupChart(geniusMap,  fullKey, titleNorm, artistNorm);
+    const shazamRank  = lookupChart(shazamMap,  fullKey, titleNorm, artistNorm);
+    const spotifyRank = lookupChart(spotifyMap, fullKey, titleNorm, artistNorm);
+    const appleRank   = lookupChart(appleMap,   fullKey, titleNorm, artistNorm);
+    const youtubeRank = lookupChart(youtubeMap, fullKey, titleNorm, artistNorm);
+    const tokScore    = lookupChart(tokMap,     fullKey, titleNorm, artistNorm);
     const sourceCount = s.sources?.length || 0;
 
-    // Shazam weighted highest (leading indicator); Apple/YouTube for mainstream confirmation
+    // Shazam weighted highest (leading indicator); Apple/YouTube for mainstream
+    // confirmation. rankScore clamps at 0 — kworb charts list up to 200 rows,
+    // and an unclamped deep rank would subtract from the score.
     let song_score = 0;
-    if (shazamRank)   song_score += 0.28 * (1 - (shazamRank  - 1) / 49);
-    if (geniusRank)   song_score += 0.20 * (1 - (geniusRank  - 1) / 49);
-    if (lfmRank)      song_score += 0.17 * (1 - (lfmRank      - 1) / 49);
-    if (appleRank)    song_score += 0.13 * (1 - (appleRank    - 1) / 99);
-    if (spotifyRank)  song_score += 0.09 * (1 - (spotifyRank  - 1) / 199);
-    if (youtubeRank)  song_score += 0.11 * (1 - (youtubeRank  - 1) / 49);
+    if (shazamRank)   song_score += 0.28 * rankScore(shazamRank, 50);
+    if (geniusRank)   song_score += 0.20 * rankScore(geniusRank, 50);
+    if (lfmRank)      song_score += 0.17 * rankScore(lfmRank, 50);
+    if (appleRank)    song_score += 0.13 * rankScore(appleRank, 100);
+    if (spotifyRank)  song_score += 0.09 * rankScore(spotifyRank, 200);
+    if (youtubeRank)  song_score += 0.11 * rankScore(youtubeRank, 50);
     if (tokScore)     song_score += 0.12 * (tokScore / 1000);
     song_score += Math.min(0.05, sourceCount * 0.02);
 
@@ -286,4 +309,4 @@ function scoreSongs(songs, lastfmTracks = [], geniusTrending = [], shazamChart =
   }).sort((a, b) => b.song_score - a.song_score);
 }
 
-module.exports = { runDigest };
+module.exports = { runDigest, scoreSongs, artistsOverlap, lookupChart, buildChartMap };
