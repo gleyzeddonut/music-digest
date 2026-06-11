@@ -9,6 +9,8 @@ cut, the Unreleased entries move under that version's heading with the date.
 
 ## [Unreleased]
 
+## [1.7.10] — 2026-06-11
+
 ### Changed
 - **Polish pass v2** (updated design handoff): softer "new OS" corner radii
   across every surface (sidebar, cards, menus, modals, inputs — pills and
