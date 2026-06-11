@@ -360,14 +360,15 @@ function Sidebar({ route, onNavigate, spotifyConnected, personas = [], activePer
             <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Update to v{updateInfo.version}</span>
           </a>
         )}
-        <div className="spotify-pill">
-          <div
-            className="dot"
-            style={spotifyConnected ? {} : { background: 'var(--muted)', boxShadow: 'none' }}
-          />
-          <div className="meta">
-            <div className="who">{spotifyConnected ? 'Connected' : 'Not connected'}</div>
-            <div className="state">Spotify</div>
+        {/* Only visible while disconnected; slides away on connect (the green
+            dot next to "Playlist" takes over as the connected signal). */}
+        <div className={`spotify-pill-wrap${spotifyConnected ? ' away' : ''}`}>
+          <div className="spotify-pill">
+            <div className="dot" style={{ background: 'var(--muted)', boxShadow: 'none' }} />
+            <div className="meta">
+              <div className="who">Not connected</div>
+              <div className="state">Spotify</div>
+            </div>
           </div>
         </div>
         {spotifyConnected && (() => {
@@ -376,6 +377,7 @@ function Sidebar({ route, onNavigate, spotifyConnected, personas = [], activePer
             <div className="playlist-name-row">
               <div className="playlist-name-label">
                 <span>Playlist</span>
+                <span className="spotify-status-dot" title="Spotify is connected" />
                 {isPersonaMode && (
                   <span className={`playlist-name-badge${playlistNameIsPersona ? ' custom' : ''}`}>
                     {playlistNameIsPersona ? 'custom' : 'shared'}

@@ -16,6 +16,10 @@ cut, the Unreleased entries move under that version's heading with the date.
   music-note icons for the new entries. All sidebar groups (Daily, Archive,
   Library) are now **foldable** — click the group header to collapse/expand
   (chevron appears on hover); collapsed state is remembered across sessions.
+- **Slimmer Spotify status**: the bottom-left "Connected / Spotify" pill now only
+  appears while disconnected and slides away on connect; once connected, a small
+  green light next to the Playlist label signals the connection (hover it for
+  "Spotify is connected").
 
 ## [1.7.8] — 2026-06-10
 

@@ -381,6 +381,25 @@ img { display: block; max-width: 100%; }
   padding: 16px 18px;
   border-top: 1px solid var(--line-soft);
 }
+/* Wrapper so the pill can slide away when Spotify connects */
+.spotify-pill-wrap {
+  max-height: 60px;
+  opacity: 1;
+  overflow: hidden;
+  transition: max-height 0.35s ease, opacity 0.25s ease;
+}
+.spotify-pill-wrap.away { max-height: 0; opacity: 0; }
+
+/* Small green light next to "Playlist" once connected */
+.spotify-status-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent-glow);
+  flex-shrink: 0;
+  cursor: help;
+}
+
 .spotify-pill {
   display: flex;
   align-items: center;
