@@ -2587,3 +2587,167 @@ img { display: block; max-width: 100%; }
 /* History "N picks · N songs" column was too narrow and wrapped */
 .hist-row { grid-template-columns: 120px 1fr 220px 116px; }
 .history-list-selecting .hist-row { grid-template-columns: 28px 120px 1fr 220px 116px; }
+/* ============================================================================
+   Music Digest — Polish Pass
+   Drop-in additions for src/styles.css
+
+   HOW TO USE
+   ----------
+   Paste this whole block at the END of src/styles.css. Every rule here
+   overrides an existing one by virtue of coming later in the cascade, so
+   nothing in your current file needs to be deleted. Each section notes the
+   original rule it refines (with its line number at time of writing) so you
+   can fold these into the source proper later if you prefer.
+
+   WHAT IT DOES
+   ------------
+   1. Calms the left column   — removes the divider lines between nav groups
+                                 (Direction A). The single biggest declutter.
+   2. Drops section underlines — serif titles stand on their own across every
+                                 screen, with a touch more breathing room.
+   3. Quiets the headlines grid — removes the top + vertical hairlines.
+   4. Softens list dividers     — History / Sources rows read as one block.
+
+   The song-signal change (cryptic chips → one hover-reveal glyph) is a JSX
+   change, not CSS — see SignalBadge.jsx and HANDOFF.md. The styles for that
+   badge live at the bottom of this file.
+   ============================================================================ */
+
+/* ── 1 · LEFT COLUMN — Direction A ───────────────────────────────────────────
+   Original (styles.css):
+     .nav-group + .nav-group { padding-top: 18px; border-top: 1px solid var(--line-soft); }   (~L305)
+     .persona-switcher { … border-bottom: 1px solid var(--line-soft); }                        (~L130)
+   The borders chop the nav into boxed sections; removing them lets it read as
+   one calm list. Spacing tightens slightly and group labels dim so the items
+   themselves lead. */
+.nav-group + .nav-group { border-top: none; padding-top: 4px; }
+.nav-group { padding-bottom: 12px; }
+.nav-label { color: var(--dim); }
+.persona-switcher { border-bottom: none; }
+/* Optional: the per-group fold chevron only appears on hover today, so it adds
+   no clutter at rest — leaving it in keeps the collapse affordance. Uncomment
+   to hide it entirely (matches the exploration's Direction A exactly):
+.nav-fold-chevron { display: none; } */
+
+
+/* ── 2 · SECTION HEADERS — drop the underline (all screens) ───────────────────
+   Original: .section-head { … border-bottom: 1px solid var(--line-soft); padding-bottom: 12px; }  (~L868)
+   Repeated on every section down every page, the underline created a ladder of
+   horizontal lines. The serif title + eyebrow carry the hierarchy on their own. */
+.section-head { border-bottom: none; padding-bottom: 0; margin-bottom: 22px; }
+
+
+/* ── 3 · HEADLINES — fewer hairlines ─────────────────────────────────────────
+   Original:
+     .headlines { … border-top: 1px solid var(--line-soft); }                            (~L1232)
+     .headline:nth-child(even) { … border-left: 1px solid var(--line-soft); }            (~L1248)
+   Drops the top rule and the vertical centre divider; the soft per-row bottom
+   border (already --line-soft) is enough to separate stories. */
+.headlines { border-top: none; }
+.headline:nth-child(even) { border-left: none; }
+
+
+/* ── 4 · LIST DIVIDERS — History & Sources ───────────────────────────────────
+   History rows already use --line-soft; just drop the trailing line so the
+   list ends cleanly.
+   Original: .hist-row { … border-bottom: 1px solid var(--line-soft); }                  (~L1516) */
+.hist-row:last-child { border-bottom: none; }
+
+/* Sources rows are separated by a hard 1px line in the page background colour,
+   which reads as stacked slats inside the card. Soften to the hairline tone and
+   drop the trailing one so the group reads as a single panel.
+   Original: .src-row { … border-bottom: 1px solid var(--bg); }                          (~L1657) */
+.src-row { border-bottom-color: var(--line-soft); }
+.src-row:last-child { border-bottom: none; }
+
+/* (Settings .set-row already uses --line-soft with a clean :last-child — no
+   change needed there.) */
+
+
+/* ── 5 · SONG SIGNAL BADGE ───────────────────────────────────────────────────
+   Styles for the new hover-reveal signal control that replaces the row of
+   cryptic .chip tags on song rows. Pair with SignalBadge.jsx. The badge sits
+   in the existing .meta-cell, so no grid changes are required.
+
+   Tints map common signal keywords to a colour; unknown signals fall back to
+   the neutral accent dot. Edit signalColor() in the JSX to extend the map. */
+.sig-badge {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 7px;
+  border-radius: 7px;
+  color: var(--muted);
+  cursor: default;
+  transition: color 0.12s, background 0.12s;
+}
+.song:hover .sig-badge { color: var(--text-2); }
+.sig-badge:hover,
+.sig-badge:focus-visible { background: var(--bg-elev); color: var(--text); outline: none; }
+.sig-badge .sig-ico { display: block; }
+.sig-badge .sig-count { font-family: var(--f-mono); font-size: 11px; line-height: 1; }
+
+.sig-tip {
+  position: absolute;
+  bottom: calc(100% + 9px);
+  right: -2px;
+  min-width: 138px;
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 9px 11px 10px;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  opacity: 0;
+  transform: translateY(5px);
+  pointer-events: none;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 6;
+}
+.sig-tip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  right: 12px;
+  border: 6px solid transparent;
+  border-top-color: var(--bg-elev);
+}
+.sig-badge:hover .sig-tip,
+.sig-badge:focus-within .sig-tip { opacity: 1; transform: translateY(0); }
+.sig-tip-label {
+  font-family: var(--f-mono);
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 7px;
+}
+.sig-tip-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--text-2);
+  padding: 3px 0;
+  white-space: nowrap;
+}
+.sig-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; background: var(--accent); }
+.sig-dot.chart     { background: #6cc8ff; }
+.sig-dot.editorial { background: var(--warn); }
+.sig-dot.community { background: var(--accent); }
+.sig-dot.velocity  { background: #d59cff; }
+
+/* The song row's signal column can shrink now that it holds one small badge
+   instead of a cluster of chips. The original grid is defined on .song — if you
+   want the title to take the reclaimed space, that's the only tweak needed.
+   (Left commented because exact column template varies; uncomment + match yours:)
+   .song { grid-template-columns: 32px 48px 1fr auto 56px 40px 40px; }  */
+
+/* allow the tooltip to escape the rounded songs container */
+.songs { overflow: visible; }
+
+/* With .songs overflow now visible (for the signal tooltip), the container no
+   longer clips square row corners — round the first/last rows' hover background
+   to match the 14px frame. */
+.song:first-child { border-top-left-radius: 13px; border-top-right-radius: 13px; }
+.song:last-child  { border-bottom-left-radius: 13px; border-bottom-right-radius: 13px; }

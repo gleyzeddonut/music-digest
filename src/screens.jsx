@@ -1,6 +1,7 @@
 import React from 'react';
 import { Icon, CoverArt, Greeting, showToast } from './components.jsx';
 import { api, bgFromName } from './api.js';
+import { SignalBadge } from './SignalBadge.jsx';
 import { getPersonaColor } from './personas.js';
 
 // ─── DigestScreen ─────────────────────────────────────────────
@@ -192,9 +193,7 @@ export function DigestScreen({ data, onArtistClick, onSongPlay, onReadBrief, run
                   <div className="artist">{s.artist}</div>
                 </div>
                 <div className="meta-cell">
-                  {s.sig?.map((sig, j) => (
-                    <span key={j} className="chip">{sig}</span>
-                  ))}
+                  <SignalBadge signals={s.sig} />
                 </div>
                 <span className="duration">{s.dur || '—'}</span>
                 <button
@@ -1179,7 +1178,7 @@ export function ArtistScreen({ artist, data, onBack }) {
                     <div className="title">{s.title}</div>
                     <div className="artist">{s.artist}</div>
                   </div>
-                  <div className="meta-cell">{s.sig?.map((sig, j) => <span key={j} className="chip">{sig}</span>)}</div>
+                  <div className="meta-cell"><SignalBadge signals={s.sig} /></div>
                   <span className="duration">{s.dur || '—'}</span>
                   <button className="action" onClick={() => {
                     const url = s.spotifyId

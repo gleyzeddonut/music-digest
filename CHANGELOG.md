@@ -45,6 +45,14 @@ cut, the Unreleased entries move under that version's heading with the date.
   music-note icons for the new entries. All sidebar groups (Daily, Archive,
   Library) are now **foldable** — click the group header to collapse/expand
   (chevron appears on hover); collapsed state is remembered across sessions.
+- **Polish pass** (from design handoff): nav-group divider lines removed so the
+  sidebar reads as one calm list; section-header underlines dropped on every
+  screen; headlines grid loses its top rule and centre divider; History/Sources
+  row dividers softened. Song rows swap the cryptic `cha/edi/com` chip cluster
+  for a single signal glyph + count that reveals the full colour-coded list on
+  hover or keyboard focus (`SignalBadge`); Monthly's `N× this month` chip is
+  unchanged. Songs container corners compensated for the tooltip's
+  `overflow: visible`.
 - **Slimmer Spotify status**: the bottom-left "Connected / Spotify" pill now only
   appears while disconnected and slides away on connect; once connected, the
   bottom of the sidebar is a single compact line — a small green light (hover:
