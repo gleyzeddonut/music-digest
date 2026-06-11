@@ -9,6 +9,8 @@ cut, the Unreleased entries move under that version's heading with the date.
 
 ## [Unreleased]
 
+## [1.7.9] — 2026-06-11
+
 ### Fixed
 - **Scoring: deep chart ranks no longer go negative.** kworb's Shazam page lists
   200 rows (TikTok 100) but the formulas assumed top-50, so e.g. Shazam #150
