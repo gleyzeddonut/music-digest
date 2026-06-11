@@ -32,6 +32,9 @@ const SVG = {
   star:     <path d="M8 2l1.5 3.5L13 6l-2.5 2.5.7 3.5L8 10.5 4.8 12l.7-3.5L3 6l3.5-.5L8 2Z" fill="currentColor"/>,
   log:      <><rect x="2" y="3" width="12" height="10" rx="1.5" strokeWidth="1.3" stroke="currentColor" fill="none"/><path d="M4.5 6.5h3M4.5 8.5h5M4.5 10.5h2" strokeWidth="1.2" stroke="currentColor" strokeLinecap="round"/></>,
   close:    <path d="M4 4l8 8M12 4l-8 8" strokeWidth="1.5" stroke="currentColor" strokeLinecap="round"/>,
+  brief:    <><rect x="3" y="2" width="10" height="12" rx="1.5" strokeWidth="1.3" stroke="currentColor" fill="none"/><path d="M5.5 5h5M5.5 7.5h5M5.5 10h3" strokeWidth="1.2" stroke="currentColor" strokeLinecap="round"/></>,
+  artists:  <><circle cx="8" cy="5.5" r="2.5" strokeWidth="1.3" stroke="currentColor" fill="none"/><path d="M3.5 13.5a4.5 4.5 0 0 1 9 0" strokeWidth="1.3" stroke="currentColor" strokeLinecap="round" fill="none"/></>,
+  songs:    <><path d="M6 12.5V4l6-1.5V11" strokeWidth="1.3" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" fill="none"/><circle cx="4.5" cy="12.5" r="1.5" strokeWidth="1.3" stroke="currentColor" fill="none"/><circle cx="10.5" cy="11" r="1.5" strokeWidth="1.3" stroke="currentColor" fill="none"/></>,
 };
 
 function Icon({ name, size = 16 }) {
@@ -99,6 +102,25 @@ function NavItem({ id, label, icon, route, onNavigate }) {
     <div
       className={`nav-item${route === id ? ' active' : ''}`}
       onClick={() => onNavigate(id)}
+    >
+      <span className="nav-icon"><Icon name={icon} /></span>
+      <span>{label}</span>
+    </div>
+  );
+}
+
+// Nav item for a section of the Today page (Artists, Songs): navigates to the
+// digest, then scrolls to the section once it has rendered.
+function SectionNavItem({ label, icon, targetId, onNavigate }) {
+  return (
+    <div
+      className="nav-item"
+      onClick={() => {
+        onNavigate('digest');
+        setTimeout(() => {
+          document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 80);
+      }}
     >
       <span className="nav-icon"><Icon name={icon} /></span>
       <span>{label}</span>
@@ -253,10 +275,17 @@ function Sidebar({ route, onNavigate, spotifyConnected, personas = [], activePer
 
       <div className="nav-group">
         <div className="nav-label">Daily</div>
-        <NavItem id="digest"  label="Today"      icon="today"    route={route} onNavigate={onNavigate} />
-        <NavItem id="monthly" label="This Month" icon="monthly"  route={route} onNavigate={onNavigate} />
-        <NavItem id="history" label="History"    icon="history"  route={route} onNavigate={onNavigate} />
-        <NavItem id="sources" label="Sources"  icon="sources" route={route} onNavigate={onNavigate} />
+        <NavItem id="digest" label="Today"     icon="today" route={route} onNavigate={onNavigate} />
+        <NavItem id="brief"  label="The Brief" icon="brief" route={route} onNavigate={onNavigate} />
+        <SectionNavItem label="Artists" icon="artists" targetId="digest-artists" onNavigate={onNavigate} />
+        <SectionNavItem label="Songs"   icon="songs"   targetId="digest-songs"   onNavigate={onNavigate} />
+      </div>
+
+      <div className="nav-group">
+        <div className="nav-label">Archive</div>
+        <NavItem id="monthly" label="This Month" icon="monthly" route={route} onNavigate={onNavigate} />
+        <NavItem id="history" label="History"    icon="history" route={route} onNavigate={onNavigate} />
+        <NavItem id="sources" label="Sources"    icon="sources" route={route} onNavigate={onNavigate} />
       </div>
 
       <div className="nav-group">

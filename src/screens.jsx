@@ -142,7 +142,7 @@ export function DigestScreen({ data, onArtistClick, onSongPlay, onReadBrief, run
 
       {/* ── Artists ── */}
       {artists?.length > 0 && (
-        <div className="section">
+        <div className="section" id="digest-artists">
           <div className="section-head">
             <div>
               <div className="section-eyebrow">Featured</div>
@@ -165,7 +165,7 @@ export function DigestScreen({ data, onArtistClick, onSongPlay, onReadBrief, run
 
       {/* ── Songs ── */}
       {songs?.length > 0 && (
-        <div className="section">
+        <div className="section" id="digest-songs">
           <div className="section-head">
             <div>
               <div className="section-eyebrow">This issue</div>
