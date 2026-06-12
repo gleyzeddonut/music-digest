@@ -9,6 +9,20 @@ cut, the Unreleased entries move under that version's heading with the date.
 
 ## [Unreleased]
 
+### Changed
+- **Run digest button upgraded** (final piece of the design handoff): at rest
+  it's a gradient play-pill with a soft glow; while running it inverts to a
+  dark pill with animated eq bars, the live phase label, and a 5-segment track
+  that fills as the real pipeline phases stream in (Scraping · Scoring ·
+  Analyzing · Playlist · Saving), plus a green hairline that sweeps the bottom
+  edge of the topbar. Completion flashes "Digest ready ✓" for 2 seconds. New
+  `src/RunButton.jsx` (`RunButton` + `RunHairline`), swapped into the Topbar;
+  old `.run-phase-text`/`.run-dots` styles removed. Respects
+  `prefers-reduced-motion`.
+- Persona switcher subtitle ("all sources") now truncates with an ellipsis
+  instead of wrapping/clipping when space is tight (small fix from the handoff
+  that was missed in the earlier polish passes).
+
 ## [1.7.10] — 2026-06-11
 
 ### Changed

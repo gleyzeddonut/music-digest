@@ -691,20 +691,6 @@ img { display: block; max-width: 100%; }
 }
 .run-btn:hover { background: #2ee06d; transform: translateY(-1px); }
 .run-btn:disabled { cursor: not-allowed; transform: none; }
-.run-phase-text { transition: opacity 0.2s; }
-.run-dots::after {
-  content: '';
-  display: inline-block;
-  width: 1.6em;
-  text-align: left;
-  animation: runDots 1.2s steps(1, end) infinite;
-}
-@keyframes runDots {
-  0%   { content: ''; }
-  25%  { content: '.'; }
-  50%  { content: '..'; }
-  75%  { content: '...'; }
-}
 
 /* ─── HERO ─── */
 .hero {
@@ -2624,6 +2610,10 @@ img { display: block; max-width: 100%; }
 .nav-group { padding-bottom: 12px; }
 .nav-label { color: var(--dim); }
 .persona-switcher { border-bottom: none; }
+/* the "all sources" subtitle under the persona name could wrap/clip when space
+   is tight — keep it on one line with an ellipsis (the name row above it
+   already does this; original .persona-trigger-sub at ~L172) */
+.persona-trigger-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* Optional: the per-group fold chevron only appears on hover today, so it adds
    no clutter at rest — leaving it in keeps the collapse affordance. Uncomment
    to hide it entirely (matches the exploration's Direction A exactly):
@@ -2826,3 +2816,144 @@ img { display: block; max-width: 100%; }
    to match the (now 18px) frame. */
 .song:first-child { border-top-left-radius: 17px; border-top-right-radius: 17px; }
 .song:last-child  { border-bottom-left-radius: 17px; border-bottom-right-radius: 17px; }
+
+
+/* ── 7 · RUN DIGEST BUTTON — richer resting state + running animation ─────────
+   Pair with RunButton.jsx (see HANDOFF.md §3). Resting: gradient play-pill
+   with a soft glow. Running: inverts to a dark pill — animated eq bars (the
+   brand's persona-switcher motif), the live phase label, and a 5-segment track
+   matching the pipeline's real phases — while a green hairline sweeps the
+   bottom edge of the topbar. Completion flashes "Digest ready ✓" for 2s.
+
+   Replaces the old dimmed-text + dots treatment (those rules have been
+   removed). Original .run-btn base is at ~L677. */
+
+.run-btn {
+  position: relative;
+  overflow: hidden;
+  min-width: 122px;
+  justify-content: center;
+  padding: 9px 16px;
+  background: linear-gradient(180deg, #2ee06d, #14b853);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 4px 14px rgba(30, 215, 96, 0.22);
+  border: 1px solid transparent;
+  /* transition only the motion props — color/background/border swap instantly
+     with the state's content swap (transitioning them can freeze mid-value in
+     throttled/offscreen contexts) */
+  transition: transform 0.15s, box-shadow 0.2s;
+}
+.run-btn:hover:not(:disabled) {
+  background: linear-gradient(180deg, #39e878, #17c757);
+  transform: translateY(-1px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.32), 0 6px 20px rgba(30, 215, 96, 0.38);
+}
+.run-btn:active:not(:disabled) { transform: scale(0.97); }
+
+.run-btn-inner {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+/* — running: dark inverted pill — */
+.run-btn.is-running {
+  background: var(--bg-elev);
+  color: var(--accent);
+  border-color: rgba(30, 215, 96, 0.32);
+  cursor: progress;
+  padding-bottom: 11px; /* seats the segment track */
+  animation: runGlow 2.4s ease-in-out infinite;
+}
+@keyframes runGlow {
+  0%, 100% { box-shadow: 0 0 12px rgba(30, 215, 96, 0.10); }
+  50%      { box-shadow: 0 0 24px rgba(30, 215, 96, 0.24); }
+}
+
+/* progress track — five segments, one per pipeline phase */
+.run-track {
+  position: absolute;
+  left: 14px; right: 14px; bottom: 4px;
+  display: flex;
+  gap: 3px;
+  height: 2px;
+}
+.run-track i {
+  flex: 1;
+  border-radius: 2px;
+  background: rgba(30, 215, 96, 0.18);
+  transition: background 0.4s;
+}
+.run-track i.on { background: var(--accent); }
+.run-track i.cur { animation: runSegPulse 1s ease-in-out infinite; }
+@keyframes runSegPulse {
+  0%, 100% { background: rgba(30, 215, 96, 0.18); }
+  50%      { background: rgba(30, 215, 96, 0.55); }
+}
+
+/* equalizer bars */
+.run-eq { display: inline-flex; align-items: flex-end; gap: 2.5px; height: 12px; }
+.run-eq span {
+  width: 2.5px;
+  border-radius: 2px;
+  background: var(--accent);
+  animation: runEqBar 0.9s ease-in-out infinite;
+}
+.run-eq span:nth-child(1) { animation-delay: 0s; }
+.run-eq span:nth-child(2) { animation-delay: 0.18s; }
+.run-eq span:nth-child(3) { animation-delay: 0.36s; }
+.run-eq span:nth-child(4) { animation-delay: 0.54s; }
+@keyframes runEqBar {
+  0%, 100% { height: 4px; }
+  50%      { height: 12px; }
+}
+
+/* phase label slides up on each change (key={phase} remounts it) */
+.run-phase { display: inline-block; animation: runPhaseIn 0.3s cubic-bezier(0.2, 0.7, 0.3, 1); }
+@keyframes runPhaseIn {
+  from { opacity: 0; transform: translateY(6px); }
+}
+
+/* — done flash — */
+.run-btn.is-done {
+  background: linear-gradient(180deg, #2ee06d, #14b853);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 0 26px rgba(30, 215, 96, 0.45);
+}
+.run-check { display: inline-grid; place-items: center; animation: runCheckPop 0.35s cubic-bezier(0.2, 1.4, 0.4, 1); }
+@keyframes runCheckPop {
+  from { transform: scale(0.3); opacity: 0; }
+}
+
+/* — content hairline — sweeps the bottom edge of the topbar while running.
+   Render <RunHairline/> as the last child of the .topbar header. */
+.run-hairline {
+  position: absolute;
+  top: 100%; left: 0;
+  height: 2px;
+  width: calc(var(--pct, 0) * 1%);
+  background: linear-gradient(90deg, rgba(30, 215, 96, 0.25), var(--accent));
+  box-shadow: 0 0 10px rgba(30, 215, 96, 0.45);
+  transition: width 0.8s cubic-bezier(0.3, 0, 0.2, 1);
+  z-index: 5;
+  pointer-events: none;
+}
+.run-hairline::after {
+  content: '';
+  position: absolute;
+  right: 0; top: 0; bottom: 0;
+  width: 42px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55));
+  animation: runHairlineShimmer 1.4s ease-in-out infinite;
+}
+@keyframes runHairlineShimmer {
+  0%, 100% { opacity: 0.2; }
+  50%      { opacity: 0.9; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .run-btn.is-running { animation: none; }
+  .run-eq span { animation: none; height: 8px; }
+  .run-track i.cur { animation: none; }
+  .run-hairline::after { animation: none; }
+}

@@ -1,6 +1,7 @@
 import React from 'react';
 import { api } from './api.js';
 import { getPersonaColor } from './personas.js';
+import { RunButton, RunHairline } from './RunButton.jsx';
 
 // ─── SVG Icon Library ─────────────────────────────────────────
 
@@ -470,17 +471,7 @@ function Topbar({ title, onRun, running, runPhase, userName, userEmail, onNaviga
       <button className="icon-btn" title="Notifications">
         <Icon name="bell" />
       </button>
-      <button
-        className="run-btn"
-        onClick={onRun}
-        disabled={running}
-        style={running ? { opacity: 0.85, cursor: 'not-allowed', minWidth: 110 } : {}}
-      >
-        {!running && <Icon name="run" size={13} />}
-        {running
-          ? <><span className="run-phase-text">{runPhase || 'Running'}</span><span className="run-dots" aria-hidden="true" /></>
-          : 'Run digest'}
-      </button>
+      <RunButton running={running} phase={runPhase} onClick={() => onRun()} />
       <div className="avatar-wrap">
         <button
           className={`avatar-btn${menuOpen ? ' open' : ''}`}
@@ -539,6 +530,7 @@ function Topbar({ title, onRun, running, runPhase, userName, userEmail, onNaviga
           </div>
         )}
       </div>
+      <RunHairline running={running} phase={runPhase} />
     </header>
   );
 }
