@@ -15,3 +15,6 @@ supabase/.temp/
 build/.apple-credentials
 build/*.p8
 *.p12
+
+# Marketing material kept alongside the repo, not part of the app
+Music Digest - Product Hero.png
