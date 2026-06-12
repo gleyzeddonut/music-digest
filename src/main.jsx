@@ -78,26 +78,38 @@ function adaptDigest(digest, list, status) {
         heroArtist.reason ||
         (heroArtist.name ? `${heroArtist.name} leads this week's brief` : "Today's brief"),
       sub:
+        heroArtist.feature?.title ||
         heroArtist.long_summary ||
         heroArtist.reason ||
         '',
-      listens:
-        heroArtist.streams
-          ? (heroArtist.streams >= 1e6
-              ? `${(heroArtist.streams / 1e6).toFixed(1)}M plays`
-              : `${(heroArtist.streams / 1e3).toFixed(0)}K plays`)
-          : '',
+      signal: (() => {
+        const ev = heroArtist.feature?.evidence;
+        if (!ev) return '';
+        const parts = [];
+        if (ev.mention_count) parts.push(`${ev.mention_count} source${ev.mention_count === 1 ? '' : 's'}`);
+        if (ev.reddit?.topUps) {
+          const ups = ev.reddit.topUps >= 1000 ? `${(ev.reddit.topUps / 1000).toFixed(1)}k` : String(ev.reddit.topUps);
+          parts.push(`top Reddit post ${ups}↑`);
+        }
+        return parts.join(' · ');
+      })(),
       rank: '#1 this week',
     },
-    brief: (digest.summary || digest.brief || '')
+    // .replace: digests saved before the pipeline normalized Claude's literal
+    // backslash-n separators still need it at render time
+    brief: (digest.summary || digest.brief || '').replace(/\\n/g, '\n')
       .split(/\n\n+/)
       .map(p => p.trim())
       .filter(Boolean)
       .flatMap(p => {
-        // If the block is all bullet lines, split each into its own entry
+        // If the block is (almost) all bullet lines, keep it as one block for
+        // list rendering. "Almost": Claude sometimes drops the • marker on
+        // the first bullet — if at most one line lacks it, mark it too,
+        // otherwise BriefScreen's bullet filter silently drops that line.
         const lines = p.split('\n').map(l => l.trim()).filter(Boolean);
-        if (lines.length > 1 && lines.every(l => l.startsWith('•'))) {
-          return [lines.join('\n')]; // keep as one block for list rendering
+        const bulletCount = lines.filter(l => l.startsWith('•')).length;
+        if (lines.length > 1 && bulletCount >= lines.length - 1 && bulletCount > 0) {
+          return [lines.map(l => (l.startsWith('•') ? l : `• ${l}`)).join('\n')];
         }
         return [p];
       }),
