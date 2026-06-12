@@ -117,6 +117,7 @@ Rules:
 - Songs list: only songs you're confident exist as actual tracks (mentioned by title in sources)
 - For each song, populate "sources" with the exact source names (e.g. "r/indieheads", "Pitchfork") that mentioned it
 - For headline_indices: return the index numbers (e.g. [0, 3, 7]) of the 6-10 most newsworthy articles from the music news section
+- For feature: write the daily mini-feature on the FIRST artist in your artists list. title = the story in one line (not just the artist's name). body = 3-5 short paragraphs separated by \\n\\n covering what happened, why attention is rising now, and the concrete evidence (sources, numbers, releases) — same factual, no-hype style as the summary. related_headline_indices = index numbers of the 2-5 news articles most relevant to that artist ([] if none are about them)
 
 Writing style for the summary:
 - Direct and factual — state what is happening, not how exciting it is
@@ -135,7 +136,7 @@ Submit your analysis via the submit_digest tool.`;
     description: 'Submit the completed daily music digest.',
     input_schema: {
       type: 'object',
-      required: ['summary', 'artists', 'songs', 'headline_indices', 'mentioned_artists'],
+      required: ['summary', 'artists', 'songs', 'headline_indices', 'mentioned_artists', 'feature'],
       properties: {
         summary: {
           type: 'string',
@@ -176,6 +177,21 @@ Submit your analysis via the submit_digest tool.`;
           type: 'array',
           items: { type: 'string' },
           description: 'every musician or band name mentioned anywhere in the summary — musicians and bands only, never actors, journalists, hosts, or other non-music figures',
+        },
+        feature: {
+          type: 'object',
+          required: ['artist', 'title', 'body', 'related_headline_indices'],
+          description: "Daily mini-feature on the first artist in 'artists'.",
+          properties: {
+            artist: { type: 'string', description: "Exactly the name of the first artist in 'artists'" },
+            title:  { type: 'string', description: "Editorial headline — the story in one line, not just the artist's name" },
+            body:   { type: 'string', description: '3-5 short paragraphs separated by \\n\\n. Factual, no hype, cite sources and numbers.' },
+            related_headline_indices: {
+              type: 'array',
+              items: { type: 'integer' },
+              description: 'index numbers (music news section) of the 2-5 articles most relevant to this artist; [] if none',
+            },
+          },
         },
       },
     },
