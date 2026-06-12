@@ -9,6 +9,8 @@ cut, the Unreleased entries move under that version's heading with the date.
 
 ## [Unreleased]
 
+## [1.7.11] — 2026-06-12
+
 ### Added
 - **Artist of the day is now a real feature.** The digest call writes a daily
   mini-article (editorial title + 3–5 factual paragraphs) about the top

@@ -1,6 +1,6 @@
 {
   "name": "music-digest",
-  "version": "1.7.10",
+  "version": "1.7.11",
   "description": "Daily music buzz digest — scrape, summarize, playlist, deliver",
   "author": "Daniel Gleyzer <dmgleyzer@gmail.com>",
   "repository": {
