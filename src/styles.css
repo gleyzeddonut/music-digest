@@ -2957,3 +2957,81 @@ img { display: block; max-width: 100%; }
   .run-track i.cur { animation: none; }
   .run-hairline::after { animation: none; }
 }
+
+
+/* ── 8 · ARTIST FEATURE — daily mini-article on ArtistScreen ─────────────────
+   Pairs with the feature branch of ArtistScreen (screens.jsx). Editorial
+   serif title, readable body, and a quiet "signal" stat block built from the
+   scorer's persisted sub-scores + evidence. */
+
+.feature-title {
+  font-family: var(--f-serif);
+  font-size: 34px;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  max-width: 680px;
+  margin: 0 0 18px;
+}
+.feature-body { max-width: 640px; }
+.feature-body p {
+  font-size: 16px;
+  line-height: 1.75;
+  color: var(--text-2);
+  margin: 0 0 18px;
+}
+
+.signal-block {
+  display: flex;
+  gap: 48px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+.signal-scores {
+  display: grid;
+  grid-template-columns: auto 160px auto;
+  gap: 10px 14px;
+  align-items: center;
+}
+.signal-score-label {
+  font-family: var(--f-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.signal-score-bar {
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+}
+.signal-score-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--accent);
+}
+.signal-score-val {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  color: var(--text-2);
+}
+.signal-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 380px;
+}
+.signal-fact {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--text-2);
+}
+.signal-fact-label {
+  font-family: var(--f-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-right: 8px;
+}
