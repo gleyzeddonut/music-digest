@@ -9,6 +9,30 @@ cut, the Unreleased entries move under that version's heading with the date.
 
 ## [Unreleased]
 
+### Added
+- **Artist of the day is now a real feature.** The digest call writes a daily
+  mini-article (editorial title + 3–5 factual paragraphs) about the top
+  artist, with linked coverage resolved from the same article indices the
+  headlines use, and a signal breakdown built from the scorer's real evidence
+  (sub-scores, source names, Reddit numbers). "Read feature →" on the hero
+  finally opens something new: article, Coverage, The signal, and a Listen
+  section (issue tracks + Spotify artist link). The hero subtitle teases the
+  feature's title instead of spoiling its first sentence, and the dead
+  streams-based stats row is replaced by real evidence ("6 sources · top
+  Reddit post 4.2k↑"). Old digests fall back to the previous layout, and the
+  hero button honestly reads "View artist →" when no feature exists. Stored
+  inside the existing artists JSON — no DB migration. New
+  `processor/feature.js` + `test/feature-attach.test.js`. Spec:
+  `docs/superpowers/specs/2026-06-11-artist-feature-design.md`.
+
+### Fixed
+- **Brief rendered as one giant bullet** (seen in the 2026-06-11 digest):
+  Claude occasionally writes the bullet separators as literal backslash-n
+  text and drops the `•` marker on the first bullet. The pipeline now
+  normalizes newlines before saving, and the UI adapter repairs already-saved
+  digests (normalizes separators and re-marks an unmarked leading bullet so
+  the brief screen doesn't silently drop it).
+
 ### Changed
 - **Run digest button upgraded** (final piece of the design handoff): at rest
   it's a gradient play-pill with a soft glow; while running it inverts to a
