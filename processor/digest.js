@@ -12,6 +12,7 @@ const { scrapeTokchart } = require('../scraper/tokchart');
 const { scrapeYoutubeSources } = require('../scraper/youtube');
 const { score, normalizeArtist, normalizeTrack, rankScore } = require('./scorer');
 const { processWithClaude } = require('./claude');
+const { attachFeature } = require('./feature');
 const { appendSongsToPlaylist } = require('./spotify');
 const { sendDigestEmail } = require('../delivery/email');
 
@@ -140,6 +141,11 @@ async function runDigest(opts = {}) {
   const result = await processWithClaude(date, redditData, webData, tiktokData, playlistData, scoredData, tokchartData);
   console.log(`[digest] Claude found ${result.artists?.length || 0} artists, ${result.songs?.length || 0} songs`);
 
+  // Claude occasionally writes the \n bullet separators as literal
+  // backslash-n text — normalize so bullet splitting works downstream and the
+  // DB stores real newlines (the 2026-06-11 digest rendered as one bullet).
+  if (typeof result.summary === 'string') result.summary = result.summary.replace(/\\n/g, '\n');
+
   // Resolve headlines from indices — guaranteed correct URLs, no title matching
   result.headlines = (result.headline_indices || [])
     .map(i => webIndex[i])
@@ -168,6 +174,11 @@ async function runDigest(opts = {}) {
     if (a.tier !== s.tier) console.warn(`[digest] Tier corrected for ${a.name}: ${a.tier} → ${s.tier}`);
     return { ...a, tier: s.tier, chart_score: s.chart, editorial_score: s.editorial, community_score: s.community, velocity_score: s.velocity };
   });
+
+  // Resolve the daily feature: coverage URLs from prompt indices, evidence
+  // from the scorer's raw material. Lands on the artist object inside the
+  // existing artists JSON column — no migration.
+  attachFeature(result, webIndex, scorerIndex);
 
   // 5. Spotify playlist
   let playlistUrl = null;
