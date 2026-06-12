@@ -68,7 +68,7 @@ export function DigestScreen({ data, onArtistClick, onSongPlay, onReadBrief, run
             <div className="hero-actions">
               {artists[0] && (
                 <button className="btn-play" onClick={() => onArtistClick(artists[0])}>
-                  Read feature →
+                  {artists[0].feature ? 'Read feature →' : 'View artist →'}
                 </button>
               )}
               {playlistUrl && (
@@ -80,9 +80,9 @@ export function DigestScreen({ data, onArtistClick, onSongPlay, onReadBrief, run
             </div>
           </div>
         </div>
-        {hero?.listens && (
+        {hero?.signal && (
           <div className="hero-meta-row">
-            <div className="hero-stat"><b>{hero.listens}</b></div>
+            <div className="hero-stat"><b>{hero.signal}</b></div>
             <div className="hero-stat">{hero.rank}</div>
           </div>
         )}
@@ -1127,6 +1127,14 @@ export function ArtistScreen({ artist, data, onBack }) {
   if (!artist) return null;
   const bg = artist.bg || 'linear-gradient(160deg, #1a2a1f, #08090a 70%)';
   const artistSongs = (data?.songs || []).filter(s => s.artist === artist.name);
+  const feature = artist.feature;
+  const evidence = feature?.evidence;
+  const subScores = [
+    ['Chart', artist.chart_score],
+    ['Editorial', artist.editorial_score],
+    ['Community', artist.community_score],
+    ['Velocity', artist.velocity_score],
+  ].filter(([, v]) => typeof v === 'number' && v > 0);
 
   return (
     <div className="fade-in">
@@ -1153,20 +1161,105 @@ export function ArtistScreen({ artist, data, onBack }) {
         <button className="btn-ghost" onClick={onBack}>← Back</button>
       </div>
       <div className="section" style={{ paddingBottom: 80 }}>
-        {artist.reason && (
+        {feature ? (
+          <div className="feature">
+            <div className="section-eyebrow" style={{ marginBottom: 12 }}>Today's feature</div>
+            <h2 className="feature-title">{feature.title}</h2>
+            <div className="feature-body">
+              {feature.body.split(/\n\n+/).map((p, i) => <p key={i}>{p}</p>)}
+            </div>
+          </div>
+        ) : artist.reason && (
           <div style={{ marginBottom: 32 }}>
             <div className="section-eyebrow" style={{ marginBottom: 12 }}>Why they're featured</div>
             <p style={{ fontSize: 16, lineHeight: 1.7, color: 'var(--text-2)', maxWidth: 640 }}>{artist.reason}</p>
           </div>
         )}
-        {artistSongs.length > 0 && (
+
+        {feature?.coverage?.length > 0 && (
           <>
-            <div className="section-head" style={{ marginTop: 24 }}>
+            <div className="section-head" style={{ marginTop: 40 }}>
               <div>
-                <div className="section-eyebrow">Songs in this issue</div>
-                <h2 className="section-title sans">Tracks</h2>
+                <div className="section-eyebrow">From the sources</div>
+                <h2 className="section-title sans">Coverage</h2>
               </div>
             </div>
+            <div className="headlines">
+              {feature.coverage.map((h, i) => (
+                <a
+                  key={i}
+                  className="headline"
+                  href={h.url || `https://www.google.com/search?q=${encodeURIComponent(h.title)}`}
+                  target="_blank"
+                  rel="noopener"
+                >
+                  <div className="src-line">
+                    <span className="src-dot" />
+                    <span>{h.source}</span>
+                  </div>
+                  <div className="headline-title">{h.title}</div>
+                </a>
+              ))}
+            </div>
+          </>
+        )}
+
+        {(subScores.length > 0 || evidence) && (
+          <>
+            <div className="section-head" style={{ marginTop: 40 }}>
+              <div>
+                <div className="section-eyebrow">Why it ranks</div>
+                <h2 className="section-title sans">The signal</h2>
+              </div>
+            </div>
+            <div className="signal-block">
+              {subScores.length > 0 && (
+                <div className="signal-scores">
+                  {subScores.map(([label, v]) => (
+                    <React.Fragment key={label}>
+                      <div className="signal-score-label">{label}</div>
+                      <div className="signal-score-bar">
+                        <i style={{ width: `${Math.round(Math.min(1, v) * 100)}%` }} />
+                      </div>
+                      <div className="signal-score-val">{Math.round(Math.min(1, v) * 100)}</div>
+                    </React.Fragment>
+                  ))}
+                </div>
+              )}
+              {evidence && (
+                <div className="signal-facts">
+                  {evidence.sources?.length > 0 && (
+                    <div className="signal-fact">
+                      <span className="signal-fact-label">Covered by</span>
+                      {evidence.sources.join(', ')}
+                    </div>
+                  )}
+                  {evidence.reddit && (
+                    <div className="signal-fact">
+                      <span className="signal-fact-label">Reddit</span>
+                      {evidence.reddit.posts} post{evidence.reddit.posts === 1 ? '' : 's'} · top {evidence.reddit.topUps}↑ {evidence.reddit.topComments}💬
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        <div className="section-head" style={{ marginTop: 40 }}>
+          <div>
+            <div className="section-eyebrow">{artistSongs.length > 0 ? 'Songs in this issue' : 'On Spotify'}</div>
+            <h2 className="section-title sans">Listen</h2>
+          </div>
+          <button
+            className="section-action"
+            onClick={() => window.open(`https://open.spotify.com/search/${encodeURIComponent(artist.name)}/artists`, '_blank')}
+          >
+            Open artist on Spotify →
+          </button>
+        </div>
+        {artistSongs.length > 0 && (
+          <>
             <div className="songs">
               {artistSongs.map((s, i) => (
                 <div key={i} className="song">
