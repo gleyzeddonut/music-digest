@@ -9,6 +9,18 @@ cut, the Unreleased entries move under that version's heading with the date.
 
 ## [Unreleased]
 
+## [1.7.12] — 2026-06-26
+
+### Fixed
+- **Personas screen highlights.** The "+ New Persona" button no longer borrows
+  the green Run-digest pill (it read as a second run button); it's now a quiet
+  neutral outline that warms to the active persona accent on hover. The
+  Run-digest button now tints to the active persona's color in every state —
+  resting gradient, hover, the running pulse (breathing glow, segment track,
+  topbar hairline), and the "Digest ready" flash — instead of always being
+  Spotify-green. It was the last hardcoded-green control while everything else
+  already followed the global `--accent` that `applyPersonaTheme` swaps.
+
 ## [1.7.11] — 2026-06-12
 
 ### Added

@@ -1824,8 +1824,7 @@ export function PersonaEditorScreen({ onDone, onRefresh, onSwitchPersona }) {
           <h2 className="section-title">Personas</h2>
         </div>
         <button
-          className="run-btn"
-          style={{ fontSize: 13, padding: '8px 16px' }}
+          className="btn-new-persona"
           onClick={startNew}
         >
           + New Persona
